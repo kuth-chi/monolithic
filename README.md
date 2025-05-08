@@ -1,0 +1,2 @@
+# monolithic
+C# monolithic architecture

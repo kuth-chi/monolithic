@@ -90,6 +90,13 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
     public DbSet<BusinessDomain.BusinessHoliday> BusinessHolidays => Set<BusinessDomain.BusinessHoliday>();
     public DbSet<BusinessDomain.AttendancePolicy> AttendancePolicies => Set<BusinessDomain.AttendancePolicy>();
 
+    // General Ledger
+    public DbSet<BusinessDomain.JournalEntry> JournalEntries => Set<BusinessDomain.JournalEntry>();
+
+    public DbSet<BusinessDomain.JournalEntryLine> JournalEntryLines => Set<BusinessDomain.JournalEntryLine>();
+
+    public DbSet<BusinessDomain.JournalEntryAuditLog> JournalEntryAuditLogs => Set<BusinessDomain.JournalEntryAuditLog>();
+
     // Inventory
     public DbSet<InventoryItem> InventoryItems => Set<InventoryItem>();
 
@@ -1186,6 +1193,87 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
                 .WithMany(wl => wl.Stocks)
                 .HasForeignKey(e => e.WarehouseLocationId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ── General Ledger ────────────────────────────────────────────────────
+
+        // Configure JournalEntry
+        modelBuilder.Entity<BusinessDomain.JournalEntry>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.EntryNumber).HasMaxLength(30).IsRequired();
+            entity.Property(e => e.FiscalPeriod).HasMaxLength(7).IsRequired();
+            entity.Property(e => e.Description).HasMaxLength(500).IsRequired();
+            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.SourceType).HasConversion<string>().HasMaxLength(30);
+            entity.Property(e => e.SourceDocumentReference).HasMaxLength(200);
+            entity.Property(e => e.CurrencyCode).HasMaxLength(3).IsRequired();
+            entity.Property(e => e.ExchangeRate).HasPrecision(18, 8);
+            entity.Property(e => e.TotalDebits).HasPrecision(18, 2);
+            entity.Property(e => e.TotalCredits).HasPrecision(18, 2);
+
+            entity.HasOne(e => e.Business)
+                .WithMany()
+                .HasForeignKey(e => e.BusinessId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Self-referencing: reversal chain — only configure the FK side
+            entity.HasOne(e => e.ReversalOfEntry)
+                .WithMany()
+                .HasForeignKey(e => e.ReversalOfEntryId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired(false);
+
+            // ReversedByEntryId is a plain nullable FK column (no navigation configured)
+            entity.Property(e => e.ReversedByEntryId).IsRequired(false);
+
+            entity.HasIndex(e => new { e.BusinessId, e.EntryNumber }).IsUnique();
+            entity.HasIndex(e => new { e.BusinessId, e.FiscalPeriod });
+            entity.HasIndex(e => new { e.BusinessId, e.TransactionDate });
+            entity.HasIndex(e => e.Status);
+        });
+
+        // Configure JournalEntryLine
+        modelBuilder.Entity<BusinessDomain.JournalEntryLine>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.DebitAmount).HasPrecision(18, 2);
+            entity.Property(e => e.CreditAmount).HasPrecision(18, 2);
+            entity.Property(e => e.DebitAmountBase).HasPrecision(18, 2);
+            entity.Property(e => e.CreditAmountBase).HasPrecision(18, 2);
+            entity.Property(e => e.CostCenter).HasMaxLength(50);
+            entity.Property(e => e.ProjectCode).HasMaxLength(50);
+            entity.Property(e => e.LineDescription).HasMaxLength(300);
+
+            entity.HasOne(e => e.JournalEntry)
+                .WithMany(je => je.Lines)
+                .HasForeignKey(e => e.JournalEntryId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Account)
+                .WithMany()
+                .HasForeignKey(e => e.AccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(e => new { e.JournalEntryId, e.LineNumber }).IsUnique();
+            entity.HasIndex(e => e.AccountId);
+        });
+
+        // Configure JournalEntryAuditLog
+        modelBuilder.Entity<BusinessDomain.JournalEntryAuditLog>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.UserDisplayName).HasMaxLength(256).IsRequired();
+            entity.Property(e => e.Action).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.Notes).HasMaxLength(500);
+
+            entity.HasOne(e => e.JournalEntry)
+                .WithMany(je => je.AuditLogs)
+                .HasForeignKey(e => e.JournalEntryId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => e.JournalEntryId);
+            entity.HasIndex(e => e.OccurredAtUtc);
         });
     }
 }

@@ -1,0 +1,2 @@
+# Uploaded inventory images are stored here at runtime.
+# Subdirectory: images/inventory/{itemId}/{filename}

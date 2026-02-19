@@ -9,6 +9,7 @@
 *.user
 *.userosscache
 *.sln.docstates
+monolithic.code-workspace
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
@@ -399,3 +400,11 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Docker
+**/.dockerignore

@@ -3,6 +3,7 @@ using Monolithic.Api.Common.Configuration;
 using Monolithic.Api.Common.Storage;
 using Monolithic.Api.Modules.Analytics;
 using Monolithic.Api.Modules.Business;
+using Monolithic.Api.Modules.Customers;
 using Monolithic.Api.Modules.Finance;
 using Monolithic.Api.Modules.Identity;
 using Monolithic.Api.Modules.Inventory;
@@ -67,6 +68,7 @@ public static class ServiceCollectionExtensions
         services.AddBusinessModule();
         services.AddFinanceModule();
         services.AddInventoryModule();
+        services.AddCustomersModule();
         services.AddVendorsModule();
         services.AddPurchaseOrdersModule();
 

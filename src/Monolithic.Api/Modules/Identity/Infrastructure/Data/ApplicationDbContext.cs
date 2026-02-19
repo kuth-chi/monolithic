@@ -63,6 +63,13 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
 
     public DbSet<BusinessDomain.CustomerBankAccount> CustomerBankAccounts => Set<BusinessDomain.CustomerBankAccount>();
 
+    // Customers
+    public DbSet<BusinessDomain.Customer> Customers => Set<BusinessDomain.Customer>();
+
+    public DbSet<BusinessDomain.CustomerContact> CustomerContacts => Set<BusinessDomain.CustomerContact>();
+
+    public DbSet<BusinessDomain.CustomerAddress> CustomerAddresses => Set<BusinessDomain.CustomerAddress>();
+
     // Accounts Payable — vendor management & payment
     public DbSet<BusinessDomain.VendorCreditTerm> VendorCreditTerms => Set<BusinessDomain.VendorCreditTerm>();
     public DbSet<BusinessDomain.VendorClass> VendorClasses => Set<BusinessDomain.VendorClass>();
@@ -831,7 +838,77 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
         modelBuilder.Entity<BusinessDomain.CustomerBankAccount>(entity =>
         {
             entity.Property(e => e.CustomerId).IsRequired();
+            entity.HasOne(e => e.Customer)
+                .WithMany(c => c.BankAccounts)
+                .HasForeignKey(e => e.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(e => new { e.CustomerId, e.AccountNumber }).IsUnique();
+        });
+
+        // ── Customer ──────────────────────────────────────────────────────────
+        modelBuilder.Entity<BusinessDomain.Customer>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.CustomerCode).HasMaxLength(50);
+            entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Email).HasMaxLength(256);
+            entity.Property(e => e.PhoneNumber).HasMaxLength(20);
+            entity.Property(e => e.TaxId).HasMaxLength(50);
+            entity.Property(e => e.PaymentTerms).HasMaxLength(100);
+            entity.Property(e => e.Website).HasMaxLength(300);
+            entity.Property(e => e.Notes).HasMaxLength(1000);
+            entity.Property(e => e.Address).HasMaxLength(300);
+            entity.Property(e => e.City).HasMaxLength(100);
+            entity.Property(e => e.StateProvince).HasMaxLength(100);
+            entity.Property(e => e.Country).HasMaxLength(100);
+            entity.Property(e => e.PostalCode).HasMaxLength(20);
+
+            entity.HasOne(e => e.Business)
+                .WithMany()
+                .HasForeignKey(e => e.BusinessId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(e => new { e.BusinessId, e.CustomerCode })
+                .IsUnique()
+                .HasFilter("[CustomerCode] <> ''");
+        });
+
+        // ── CustomerContact ───────────────────────────────────────────────────
+        modelBuilder.Entity<BusinessDomain.CustomerContact>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.FullName).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.JobTitle).HasMaxLength(120);
+            entity.Property(e => e.Department).HasMaxLength(100);
+            entity.Property(e => e.Email).HasMaxLength(256);
+            entity.Property(e => e.Phone).HasMaxLength(20);
+
+            entity.HasOne(e => e.Customer)
+                .WithMany(c => c.Contacts)
+                .HasForeignKey(e => e.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.CustomerId, e.IsPrimary });
+        });
+
+        // ── CustomerAddress ───────────────────────────────────────────────────
+        modelBuilder.Entity<BusinessDomain.CustomerAddress>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.AddressType).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.AddressLine1).HasMaxLength(300).IsRequired();
+            entity.Property(e => e.AddressLine2).HasMaxLength(300);
+            entity.Property(e => e.City).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.StateProvince).HasMaxLength(100);
+            entity.Property(e => e.Country).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.PostalCode).HasMaxLength(20);
+
+            entity.HasOne(e => e.Customer)
+                .WithMany(c => c.Addresses)
+                .HasForeignKey(e => e.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.CustomerId, e.IsDefault });
         });
 
         // ── BusinessLicense ───────────────────────────────────────────────────

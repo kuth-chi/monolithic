@@ -1,9 +1,11 @@
 namespace Monolithic.Api.Modules.Business.Domain;
 
 /// <summary>
-/// Customer domain is not implemented yet, so this stores CustomerId as a future-safe reference.
+/// A bank account owned by a customer.
 /// </summary>
 public sealed class CustomerBankAccount : BankAccountBase
 {
     public Guid CustomerId { get; set; }
+
+    public Customer Customer { get; set; } = null!;
 }

@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using Monolithic.Api.Modules.Customers.Application;
-using Monolithic.Api.Modules.Customers.Contracts;
+using Monolithic.Api.Modules.Sales.Customers.Application;
+using Monolithic.Api.Modules.Sales.Customers.Contracts;
 using Monolithic.Api.Modules.Identity.Authorization;
 
 namespace Monolithic.Api.Controllers.V1;

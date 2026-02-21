@@ -97,6 +97,20 @@ public sealed class InventoryService(ApplicationDbContext db) : IInventoryServic
         return true;
     }
 
+    public async Task<IReadOnlyCollection<InventoryItemDto>> GetLowStockItemsAsync(
+        Guid businessId, CancellationToken cancellationToken = default)
+    {
+        var items = await db.InventoryItems
+            .Include(i => i.Stocks)
+            .Where(i => i.BusinessId == businessId && i.IsActive && i.ReorderLevel > 0)
+            .ToListAsync(cancellationToken);
+
+        return items
+            .Where(i => i.Stocks.Sum(s => s.QuantityOnHand) <= i.ReorderLevel)
+            .Select(MapItemToDto)
+            .ToList();
+    }
+
     // ── Stock ──────────────────────────────────────────────────────────────
 
     public async Task<IReadOnlyCollection<StockDto>> GetStockByItemAsync(

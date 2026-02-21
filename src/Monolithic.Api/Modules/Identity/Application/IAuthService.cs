@@ -1,0 +1,33 @@
+using Monolithic.Api.Modules.Identity.Contracts;
+
+namespace Monolithic.Api.Modules.Identity.Application;
+
+/// <summary>
+/// Authentication service: login, business-context switching, and caller profile.
+/// </summary>
+public interface IAuthService
+{
+    /// <summary>
+    /// Validates credentials and returns an access token scoped to the user's default business.
+    /// Returns <c>null</c> when credentials are invalid or the account is inactive.
+    /// </summary>
+    Task<LoginResponse?> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Changes the user's default business to <paramref name="targetBusinessId"/>,
+    /// enforces the single-default-per-user rule, and issues a fresh access token
+    /// scoped to the new context.
+    /// Returns <c>null</c> when the user does not have an active membership in the target business.
+    /// </summary>
+    Task<SwitchBusinessResponse?> SwitchDefaultBusinessAsync(
+        Guid userId,
+        Guid targetBusinessId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the full caller profile: identity, active-business context, all business memberships,
+    /// roles, and effective permissions.
+    /// Returns <c>null</c> when the user no longer exists.
+    /// </summary>
+    Task<MeResponse?> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken = default);
+}

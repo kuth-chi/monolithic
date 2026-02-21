@@ -1,10 +1,12 @@
+using Monolithic.Api.Common.SoftDelete;
+
 namespace Monolithic.Api.Modules.Business.Domain;
 
 /// <summary>
 /// Represents a customer of a business.
 /// A customer can have contacts, addresses, and bank accounts.
 /// </summary>
-public sealed class Customer : BusinessPartyBase
+public sealed class Customer : BusinessPartyBase, IBusinessScoped
 {
     /// <summary>The business that owns this customer record.</summary>
     public Guid BusinessId { get; set; }

@@ -128,6 +128,15 @@ public sealed class InventoryController(IInventoryService inventoryService) : Co
         return Created(string.Empty, transaction);
     }
 
+    [HttpGet("items/low-stock")]
+    [RequirePermission("inventory:read")]
+    [ProducesResponseType<IReadOnlyCollection<InventoryItemDto>>(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetLowStockItems([FromQuery] Guid businessId, CancellationToken cancellationToken)
+    {
+        var items = await inventoryService.GetLowStockItemsAsync(businessId, cancellationToken);
+        return Ok(items);
+    }
+
     [HttpPost("transactions/transfer")]
     [RequirePermission("inventory:update")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

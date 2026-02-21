@@ -1,9 +1,15 @@
+using System.Linq.Expressions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Monolithic.Api.Common.SoftDelete;
 using Monolithic.Api.Modules.Identity.Domain;
 using BusinessDomain = Monolithic.Api.Modules.Business.Domain;
 using Monolithic.Api.Modules.Inventory.Domain;
+using PlatformDomain = Monolithic.Api.Modules.Platform;
+using SalesDomain = Monolithic.Api.Modules.Sales.Domain;
+using FinanceDomain = Monolithic.Api.Modules.Finance.Domain;
+using PurchaseOrdersDomain = Monolithic.Api.Modules.Purchases.Domain;
 
 namespace Monolithic.Api.Modules.Identity.Infrastructure.Data;
 
@@ -15,6 +21,10 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
 
     public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
+
+    public DbSet<UserBusiness> UserBusinesses => Set<UserBusiness>();
+
+    public DbSet<AuthAuditLog> AuthAuditLogs => Set<AuthAuditLog>();
 
     public DbSet<Contact> Contacts => Set<Contact>();
 
@@ -114,6 +124,47 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
 
     public DbSet<InventoryItemImage> InventoryItemImages => Set<InventoryItemImage>();
 
+    // ── Platform Foundation ───────────────────────────────────────────────────
+
+    public DbSet<PlatformDomain.Templates.Domain.TemplateDefinition> TemplateDefinitions
+        => Set<PlatformDomain.Templates.Domain.TemplateDefinition>();
+
+    public DbSet<PlatformDomain.Templates.Domain.TemplateVersion> TemplateVersions
+        => Set<PlatformDomain.Templates.Domain.TemplateVersion>();
+
+    public DbSet<PlatformDomain.Themes.Domain.ThemeProfile> ThemeProfiles
+        => Set<PlatformDomain.Themes.Domain.ThemeProfile>();
+
+    public DbSet<PlatformDomain.UserPreferences.Domain.UserPreference> UserPreferences
+        => Set<PlatformDomain.UserPreferences.Domain.UserPreference>();
+
+    public DbSet<PlatformDomain.FeatureFlags.Domain.FeatureFlag> FeatureFlags
+        => Set<PlatformDomain.FeatureFlags.Domain.FeatureFlag>();
+
+    public DbSet<PlatformDomain.Notifications.Domain.NotificationLog> NotificationLogs
+        => Set<PlatformDomain.Notifications.Domain.NotificationLog>();
+
+    // ── Sales Module ──────────────────────────────────────────────────────────
+    public DbSet<SalesDomain.Quotation> Quotations => Set<SalesDomain.Quotation>();
+    public DbSet<SalesDomain.QuotationItem> QuotationItems => Set<SalesDomain.QuotationItem>();
+    public DbSet<SalesDomain.SalesOrder> SalesOrders => Set<SalesDomain.SalesOrder>();
+    public DbSet<SalesDomain.SalesOrderItem> SalesOrderItems => Set<SalesDomain.SalesOrderItem>();
+    public DbSet<SalesDomain.SalesInvoice> SalesInvoices => Set<SalesDomain.SalesInvoice>();
+    public DbSet<SalesDomain.SalesInvoiceItem> SalesInvoiceItems => Set<SalesDomain.SalesInvoiceItem>();
+    public DbSet<SalesDomain.SalesInvoicePayment> SalesInvoicePayments => Set<SalesDomain.SalesInvoicePayment>();
+    public DbSet<SalesDomain.ArCreditNote> ArCreditNotes => Set<SalesDomain.ArCreditNote>();
+    public DbSet<SalesDomain.ArCreditNoteItem> ArCreditNoteItems => Set<SalesDomain.ArCreditNoteItem>();
+    public DbSet<SalesDomain.ArCreditNoteApplication> ArCreditNoteApplications => Set<SalesDomain.ArCreditNoteApplication>();
+
+    // ── Finance — Expenses ─────────────────────────────────────────────────────
+    public DbSet<FinanceDomain.ExpenseCategory> ExpenseCategories => Set<FinanceDomain.ExpenseCategory>();
+    public DbSet<FinanceDomain.Expense> Expenses => Set<FinanceDomain.Expense>();
+    public DbSet<FinanceDomain.ExpenseItem> ExpenseItems => Set<FinanceDomain.ExpenseItem>();
+
+    // ── Purchase Returns ──────────────────────────────────────────────────────
+    public DbSet<PurchaseOrdersDomain.PurchaseReturn> PurchaseReturns => Set<PurchaseOrdersDomain.PurchaseReturn>();
+    public DbSet<PurchaseOrdersDomain.PurchaseReturnItem> PurchaseReturnItems => Set<PurchaseOrdersDomain.PurchaseReturnItem>();
+
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
     {
     }
@@ -121,6 +172,125 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        // ── Global soft-delete query filters ────────────────────────────────────────────────
+        // Any entity that implements ISoftDeletable automatically gets a filter
+        // excluding records where IsDeleted = true from every query.
+        // EF Core rule: HasQueryFilter must be applied to the ROOT entity type only.
+        // Derived TPH types (e.g. Contact, Employee → ApplicationUser) inherit the
+        // filter automatically — explicitly adding it to a derived type throws.
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (!typeof(ISoftDeletable).IsAssignableFrom(entityType.ClrType))
+                continue;
+
+            // Skip derived types — the filter on the root covers the whole hierarchy.
+            if (entityType.BaseType != null)
+                continue;
+
+            var parameter = Expression.Parameter(entityType.ClrType, "e");
+            var property  = Expression.Property(parameter, nameof(ISoftDeletable.IsDeleted));
+            var condition  = Expression.Lambda(Expression.Not(property), parameter);
+            modelBuilder.Entity(entityType.ClrType).HasQueryFilter(condition);
+        }
+
+        // ── Cascade soft-delete query filters for dependent entities ─────────────────────
+        // EF Core warns when a required-end parent has a query filter but dependents do not.
+        // Applying matching filters here prevents "orphaned" child rows appearing in queries
+        // after the parent has been soft-deleted.
+
+        // ─ Business children ─────────────────────────────────────────────────────────────
+        modelBuilder.Entity<BusinessDomain.BusinessBranch>()
+            .HasQueryFilter(e => !e.Business.IsDeleted);
+        // BranchEmployee navigates through BusinessBranch
+        modelBuilder.Entity<BusinessDomain.BranchEmployee>()
+            .HasQueryFilter(e => !e.Branch.Business.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.BusinessContact>()
+            .HasQueryFilter(e => !e.Business.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.BusinessHoliday>()
+            .HasQueryFilter(e => !e.Business.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.BusinessIndustry>()
+            .HasQueryFilter(e => !e.Business.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.BusinessMedia>()
+            .HasQueryFilter(e => !e.Business.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.BusinessOwnership>()
+            .HasQueryFilter(e => !e.Business.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.BusinessSetting>()
+            .HasQueryFilter(e => !e.Business.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.AttendancePolicy>()
+            .HasQueryFilter(e => !e.Business.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.VendorClass>()
+            .HasQueryFilter(e => !e.Business.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.VendorCreditTerm>()
+            .HasQueryFilter(e => !e.Business.IsDeleted);
+
+        // ─ Business + Vendor children ─────────────────────────────────────────────────────
+        modelBuilder.Entity<BusinessDomain.ApCreditNote>()
+            .HasQueryFilter(e => !e.Business.IsDeleted && !e.Vendor.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.ApPaymentSchedule>()
+            .HasQueryFilter(e => !e.Business.IsDeleted && !e.Vendor.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.ApPaymentSession>()
+            .HasQueryFilter(e => !e.Business.IsDeleted && !e.Vendor.IsDeleted);
+        // ApPaymentSessionLine navigates through ApPaymentSession
+        modelBuilder.Entity<BusinessDomain.ApPaymentSessionLine>()
+            .HasQueryFilter(e => !e.Session.Business.IsDeleted && !e.Session.Vendor.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.EstimatePurchaseOrder>()
+            .HasQueryFilter(e => !e.Business.IsDeleted && !e.Vendor.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.PurchaseOrder>()
+            .HasQueryFilter(e => !e.Business.IsDeleted && !e.Vendor.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.VendorBill>()
+            .HasQueryFilter(e => !e.Business.IsDeleted && !e.Vendor.IsDeleted);
+
+        // ─ Customer children ──────────────────────────────────────────────────────────────
+        modelBuilder.Entity<BusinessDomain.CustomerAddress>()
+            .HasQueryFilter(e => !e.Customer.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.CustomerContact>()
+            .HasQueryFilter(e => !e.Customer.IsDeleted);
+
+        // ─ Vendor children ────────────────────────────────────────────────────────────────
+        modelBuilder.Entity<BusinessDomain.VendorProfile>()
+            .HasQueryFilter(e => !e.Vendor.IsDeleted);
+
+        // Note: BusinessBankAccount, CustomerBankAccount, VendorBankAccount all inherit
+        // from BankAccountBase (TPH). EF Core forbids HasQueryFilter on derived types;
+        // they are accessed through already-filtered parent navigation collections.
+
+        // ─ Finance children ───────────────────────────────────────────────────────────────
+        modelBuilder.Entity<BusinessDomain.ChartOfAccount>()
+            .HasQueryFilter(e => !e.Business.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.CostLedgerEntry>()
+            .HasQueryFilter(e => !e.Business.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.CostingSetup>()
+            .HasQueryFilter(e => !e.Business.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.JournalEntry>()
+            .HasQueryFilter(e => !e.Business.IsDeleted);
+        // JournalEntry line items navigate through the already-filtered JournalEntry
+        modelBuilder.Entity<BusinessDomain.JournalEntryLine>()
+            .HasQueryFilter(e => !e.JournalEntry.Business.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.JournalEntryAuditLog>()
+            .HasQueryFilter(e => !e.JournalEntry.Business.IsDeleted);
+
+        // ─ Vendor AP line items ───────────────────────────────────────────────────────────
+        modelBuilder.Entity<BusinessDomain.VendorBillItem>()
+            .HasQueryFilter(e => !e.VendorBill.Business.IsDeleted && !e.VendorBill.Vendor.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.VendorBillPayment>()
+            .HasQueryFilter(e => !e.VendorBill.Business.IsDeleted && !e.VendorBill.Vendor.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.ApCreditNoteApplication>()
+            .HasQueryFilter(e => !e.CreditNote.Business.IsDeleted && !e.CreditNote.Vendor.IsDeleted);
+
+        // ─ Purchase order line items ──────────────────────────────────────────────────────
+        modelBuilder.Entity<BusinessDomain.PurchaseOrderItem>()
+            .HasQueryFilter(e => !e.PurchaseOrder.Business.IsDeleted && !e.PurchaseOrder.Vendor.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.EstimatePurchaseOrderItem>()
+            .HasQueryFilter(e => !e.EstimatePurchaseOrder.Business.IsDeleted && !e.EstimatePurchaseOrder.Vendor.IsDeleted);
+
+        // ─ Identity / role / user children ───────────────────────────────────────────────
+        modelBuilder.Entity<RolePermission>()
+            .HasQueryFilter(e => !e.Role!.IsDeleted);
+        modelBuilder.Entity<UserPermission>()
+            .HasQueryFilter(e => !e.User!.IsDeleted);
+        modelBuilder.Entity<UserBusiness>()
+            .HasQueryFilter(e => !e.Business.IsDeleted && !e.User.IsDeleted);
 
         // Rename Identity tables to follow convention
         modelBuilder.Entity<ApplicationUser>().ToTable("AspNetUsers");
@@ -130,6 +300,27 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
         modelBuilder.Entity<IdentityUserLogin<Guid>>().ToTable("AspNetUserLogins");
         modelBuilder.Entity<IdentityUserToken<Guid>>().ToTable("AspNetUserTokens");
         modelBuilder.Entity<IdentityUserRole<Guid>>().ToTable("AspNetUserRoles");
+
+        // Configure ApplicationRole — soft-delete columns + IsSystemRole
+        modelBuilder.Entity<ApplicationRole>(entity =>
+        {
+            entity.Property(e => e.IsSystemRole).HasDefaultValue(false);
+            entity.Property(e => e.IsDeleted).HasDefaultValue(false);
+            entity.Property(e => e.DeletedAtUtc).IsRequired(false);
+            entity.Property(e => e.DeletedByUserId).IsRequired(false);
+            // Fast look-up for purge runner and admin queries
+            entity.HasIndex(e => e.IsSystemRole);
+            entity.HasIndex(e => new { e.IsDeleted, e.DeletedAtUtc });
+        });
+
+        // Configure ApplicationUser — soft-delete columns
+        modelBuilder.Entity<ApplicationUser>(entity =>
+        {
+            entity.Property(e => e.IsDeleted).HasDefaultValue(false);
+            entity.Property(e => e.DeletedAtUtc).IsRequired(false);
+            entity.Property(e => e.DeletedByUserId).IsRequired(false);
+            entity.HasIndex(e => new { e.IsDeleted, e.DeletedAtUtc });
+        });
 
         // Configure Permission
         modelBuilder.Entity<Permission>(entity =>
@@ -239,6 +430,10 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
                 .WithMany()
                 .HasForeignKey(e => e.OwnerEmployeeId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // Soft-delete index for purge runner
+            entity.HasIndex(e => new { e.IsDeleted, e.DeletedAtUtc })
+                .HasDatabaseName("IX_Businesses_SoftDelete");
         });
 
         // Configure BusinessIndustry (many-to-many)
@@ -291,6 +486,9 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
                 .WithMany(b => b.Vendors)
                 .HasForeignKey(e => e.BusinessId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.BusinessId, e.IsDeleted, e.DeletedAtUtc })
+                .HasDatabaseName("IX_Vendors_SoftDelete");
         });
 
         // Configure VendorCreditTerm
@@ -878,6 +1076,9 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
             entity.HasIndex(e => new { e.BusinessId, e.CustomerCode })
                 .IsUnique()
                 .HasFilter("[CustomerCode] <> ''");
+
+            entity.HasIndex(e => new { e.BusinessId, e.IsDeleted, e.DeletedAtUtc })
+                .HasDatabaseName("IX_Customers_SoftDelete");
         });
 
         // ── CustomerContact ───────────────────────────────────────────────────
@@ -1275,5 +1476,357 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
             entity.HasIndex(e => e.JournalEntryId);
             entity.HasIndex(e => e.OccurredAtUtc);
         });
+
+        // Configure AuthAuditLog (append-only, never updated)
+        modelBuilder.Entity<AuthAuditLog>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Event).HasConversion<string>().HasMaxLength(30).IsRequired();
+            entity.Property(e => e.Email).HasMaxLength(256).IsRequired();
+            entity.Property(e => e.IpAddress).HasMaxLength(45);   // fits IPv6
+            entity.Property(e => e.UserAgent).HasMaxLength(500);
+            entity.Property(e => e.FailureReason).HasMaxLength(256);
+
+            // Fast lookups: by user, by email (failed attempts), by time window, by event type
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.Email);
+            entity.HasIndex(e => e.OccurredAtUtc);
+            entity.HasIndex(e => new { e.Event, e.OccurredAtUtc });
+        });
+
+        // Configure UserBusiness (user → business membership with single-default rule)
+        modelBuilder.Entity<UserBusiness>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Business)
+                .WithMany()
+                .HasForeignKey(e => e.BusinessId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // One user may belong to a business only once
+            entity.HasIndex(e => new { e.UserId, e.BusinessId }).IsUnique();
+
+            // Fast lookup for the default-business resolution on login
+            entity.HasIndex(e => new { e.UserId, e.IsDefault });
+        });
+
+        // ── Platform Foundation ───────────────────────────────────────────────
+
+        // TemplateDefinition
+        modelBuilder.Entity<PlatformDomain.Templates.Domain.TemplateDefinition>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Slug).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.DisplayName).HasMaxLength(300).IsRequired();
+            entity.Property(e => e.AvailableVariables).HasMaxLength(2000);
+            entity.HasIndex(e => new { e.Slug, e.Scope, e.BusinessId, e.UserId }).IsUnique();
+            entity.HasMany(e => e.Versions)
+                .WithOne(v => v.Definition)
+                .HasForeignKey(v => v.TemplateDefinitionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // TemplateVersion
+        modelBuilder.Entity<PlatformDomain.Templates.Domain.TemplateVersion>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.VersionLabel).HasMaxLength(20).IsRequired();
+            entity.Property(e => e.ChangeNotes).HasMaxLength(1000);
+        });
+
+        // ThemeProfile
+        modelBuilder.Entity<PlatformDomain.Themes.Domain.ThemeProfile>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(100).IsRequired();
+            entity.HasIndex(e => new { e.BusinessId, e.Name }).IsUnique();
+            entity.Property(e => e.ColorPrimary).HasMaxLength(20);
+            entity.Property(e => e.ColorSecondary).HasMaxLength(20);
+            entity.Property(e => e.ColorAccent).HasMaxLength(20);
+            entity.Property(e => e.FontFamily).HasMaxLength(200);
+        });
+
+        // UserPreference
+        modelBuilder.Entity<PlatformDomain.UserPreferences.Domain.UserPreference>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.UserId, e.BusinessId }).IsUnique();
+            entity.Property(e => e.ColorScheme).HasMaxLength(20);
+            entity.Property(e => e.PreferredLocale).HasMaxLength(20);
+            entity.Property(e => e.PreferredTimezone).HasMaxLength(60);
+        });
+
+        // FeatureFlag
+        modelBuilder.Entity<PlatformDomain.FeatureFlags.Domain.FeatureFlag>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Key).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.DisplayName).HasMaxLength(300);
+            entity.HasIndex(e => new { e.Key, e.Scope, e.BusinessId, e.UserId }).IsUnique();
+        });
+
+        // NotificationLog
+        modelBuilder.Entity<PlatformDomain.Notifications.Domain.NotificationLog>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Recipient).HasMaxLength(500).IsRequired();
+            entity.Property(e => e.TemplateSl).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Subject).HasMaxLength(500);
+            entity.HasIndex(e => new { e.BusinessId, e.CreatedAtUtc });
+            entity.HasIndex(e => new { e.UserId, e.Status });
+        });
+
+        // ── Sales Module ──────────────────────────────────────────────────────
+
+        modelBuilder.Entity<SalesDomain.Quotation>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.QuotationNumber).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(30);
+            entity.Property(e => e.CurrencyCode).HasMaxLength(3);
+            entity.Property(e => e.Notes).HasMaxLength(2000);
+            entity.Property(e => e.TermsAndConditions).HasMaxLength(4000);
+            entity.Property(e => e.OrderDiscountType).HasConversion<string>().HasMaxLength(20);
+            entity.HasIndex(e => new { e.BusinessId, e.QuotationNumber }).IsUnique();
+        });
+
+        modelBuilder.Entity<SalesDomain.QuotationItem>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Description).HasMaxLength(1000);
+            entity.Property(e => e.Unit).HasMaxLength(50);
+            entity.Property(e => e.Notes).HasMaxLength(500);
+            entity.Property(e => e.DiscountType).HasConversion<string>().HasMaxLength(20);
+            entity.HasOne(e => e.Quotation)
+                .WithMany(q => q.Items)
+                .HasForeignKey(e => e.QuotationId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SalesDomain.SalesOrder>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.OrderNumber).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(30);
+            entity.Property(e => e.CurrencyCode).HasMaxLength(3);
+            entity.Property(e => e.Notes).HasMaxLength(2000);
+            entity.Property(e => e.OrderDiscountType).HasConversion<string>().HasMaxLength(20);
+            entity.HasIndex(e => new { e.BusinessId, e.OrderNumber }).IsUnique();
+        });
+
+        modelBuilder.Entity<SalesDomain.SalesOrderItem>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Description).HasMaxLength(1000);
+            entity.Property(e => e.Unit).HasMaxLength(50);
+            entity.Property(e => e.Notes).HasMaxLength(500);
+            entity.Property(e => e.DiscountType).HasConversion<string>().HasMaxLength(20);
+            entity.HasOne(e => e.SalesOrder)
+                .WithMany(so => so.Items)
+                .HasForeignKey(e => e.SalesOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SalesDomain.SalesInvoice>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.InvoiceNumber).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.CustomerReference).HasMaxLength(100);
+            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(30);
+            entity.Property(e => e.CurrencyCode).HasMaxLength(3);
+            entity.Property(e => e.Notes).HasMaxLength(2000);
+            entity.Property(e => e.TermsAndConditions).HasMaxLength(4000);
+            entity.Property(e => e.OrderDiscountType).HasConversion<string>().HasMaxLength(20);
+            entity.HasIndex(e => new { e.BusinessId, e.InvoiceNumber }).IsUnique();
+        });
+
+        modelBuilder.Entity<SalesDomain.SalesInvoiceItem>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Description).HasMaxLength(1000);
+            entity.Property(e => e.Unit).HasMaxLength(50);
+            entity.Property(e => e.Notes).HasMaxLength(500);
+            entity.Property(e => e.DiscountType).HasConversion<string>().HasMaxLength(20);
+            entity.HasOne(e => e.SalesInvoice)
+                .WithMany(si => si.Items)
+                .HasForeignKey(e => e.SalesInvoiceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SalesDomain.SalesInvoicePayment>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.PaymentMethod).HasMaxLength(50);
+            entity.Property(e => e.PaymentReference).HasMaxLength(100);
+            entity.Property(e => e.Notes).HasMaxLength(500);
+            entity.Property(e => e.CurrencyCode).HasMaxLength(3);
+            entity.HasOne(e => e.SalesInvoice)
+                .WithMany(si => si.Payments)
+                .HasForeignKey(e => e.SalesInvoiceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SalesDomain.ArCreditNote>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.CreditNoteNumber).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(30);
+            entity.Property(e => e.CurrencyCode).HasMaxLength(3);
+            entity.Property(e => e.Reason).HasMaxLength(1000);
+            entity.Property(e => e.Notes).HasMaxLength(2000);
+            entity.HasIndex(e => new { e.BusinessId, e.CreditNoteNumber }).IsUnique();
+        });
+
+        modelBuilder.Entity<SalesDomain.ArCreditNoteItem>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Description).HasMaxLength(1000);
+            entity.Property(e => e.Unit).HasMaxLength(50);
+            entity.Property(e => e.Notes).HasMaxLength(500);
+            entity.HasOne(e => e.ArCreditNote)
+                .WithMany(cn => cn.Items)
+                .HasForeignKey(e => e.ArCreditNoteId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SalesDomain.ArCreditNoteApplication>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Notes).HasMaxLength(500);
+            entity.HasOne(e => e.ArCreditNote)
+                .WithMany(cn => cn.Applications)
+                .HasForeignKey(e => e.ArCreditNoteId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.SalesInvoice)
+                .WithMany(si => si.CreditNoteApplications)
+                .HasForeignKey(e => e.SalesInvoiceId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ── Finance — Expenses ─────────────────────────────────────────────────
+
+        modelBuilder.Entity<FinanceDomain.ExpenseCategory>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.HasIndex(e => new { e.BusinessId, e.Name }).IsUnique();
+        });
+
+        modelBuilder.Entity<FinanceDomain.Expense>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ExpenseNumber).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Title).HasMaxLength(300).IsRequired();
+            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(30);
+            entity.Property(e => e.CurrencyCode).HasMaxLength(3);
+            entity.Property(e => e.Notes).HasMaxLength(2000);
+            entity.Property(e => e.RejectionReason).HasMaxLength(1000);
+            entity.HasIndex(e => new { e.BusinessId, e.ExpenseNumber }).IsUnique();
+        });
+
+        modelBuilder.Entity<FinanceDomain.ExpenseItem>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Description).HasMaxLength(500).IsRequired();
+            entity.Property(e => e.CurrencyCode).HasMaxLength(3);
+            entity.Property(e => e.Notes).HasMaxLength(500);
+            entity.HasOne(e => e.Expense)
+                .WithMany(ex => ex.Items)
+                .HasForeignKey(e => e.ExpenseId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── Purchase Returns ──────────────────────────────────────────────────
+
+        modelBuilder.Entity<PurchaseOrdersDomain.PurchaseReturn>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ReturnNumber).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(30);
+            entity.Property(e => e.CurrencyCode).HasMaxLength(3);
+            entity.Property(e => e.Reason).HasMaxLength(1000);
+            entity.Property(e => e.Notes).HasMaxLength(2000);
+            entity.HasIndex(e => new { e.BusinessId, e.ReturnNumber }).IsUnique();
+        });
+
+        modelBuilder.Entity<PurchaseOrdersDomain.PurchaseReturnItem>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Notes).HasMaxLength(500);
+            entity.HasOne(e => e.PurchaseReturn)
+                .WithMany(pr => pr.Items)
+                .HasForeignKey(e => e.PurchaseReturnId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // Soft-delete interception: convert EntityState.Deleted → EntityState.Modified
+    // ────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Intercepts hard-delete calls for any <see cref="ISoftDeletable"/> entity and
+    /// converts them to a soft-delete (sets <c>IsDeleted = true</c>, records timestamp).
+    /// Hard-deletes are only performed by the dedicated <c>SoftDeletePurgeService</c>
+    /// which calls <see cref="HardDeleteAsync"/> directly.
+    /// </summary>
+    private void ApplySoftDeleteInterception()
+    {
+        var deletedEntries = ChangeTracker.Entries()
+            .Where(e => e.State == EntityState.Deleted && e.Entity is ISoftDeletable)
+            .ToList();
+
+        foreach (var entry in deletedEntries)
+        {
+            var entity = (ISoftDeletable)entry.Entity;
+
+            // Guard: refuse to soft-delete a protected system role
+            if (entry.Entity is ApplicationRole role && role.IsSystemRole)
+                throw new InvalidOperationException(
+                    $"Role \u2018{role.Name}\u2019 is a protected system role and cannot be deleted.");
+
+            entry.State = EntityState.Modified;
+            entity.IsDeleted = true;
+            entity.DeletedAtUtc = DateTimeOffset.UtcNow;
+        }
+    }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        ApplySoftDeleteInterception();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(
+        bool acceptAllChangesOnSuccess,
+        CancellationToken cancellationToken = default)
+    {
+        ApplySoftDeleteInterception();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    /// <summary>
+    /// Bypasses soft-delete interception and permanently removes a row.
+    /// Called exclusively by <c>SoftDeletePurgeService</c> after the retention window has expired.
+    /// Uses <c>ExecuteDeleteAsync</c> which goes directly to the database, bypassing the EF change tracker
+    /// and therefore never triggering <see cref="ApplySoftDeleteInterception"/>.
+    /// </summary>
+    public async Task<int> HardDeleteWhereAsync<TEntity>(
+        Expression<Func<TEntity, bool>> predicate,
+        CancellationToken cancellationToken = default)
+        where TEntity : class
+    {
+        // ExecuteDeleteAsync sends DELETE directly — no change tracker, no interception
+        return await Set<TEntity>()
+            .IgnoreQueryFilters()   // include already-soft-deleted rows
+            .Where(predicate)
+            .ExecuteDeleteAsync(cancellationToken);
     }
 }

@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Monolithic.Api.Common.Caching;
+using Monolithic.Api.Common.Pagination;
 using Monolithic.Api.Common.Storage;
 using Monolithic.Api.Modules.Business.Contracts;
 using Monolithic.Api.Modules.Business.Domain;
@@ -273,26 +275,100 @@ public sealed class BusinessOwnershipService(
 
 // ── BusinessBranchService ─────────────────────────────────────────────────────
 
+/// <summary>
+/// Cache TTLs: lists → L2 5 min / L1 60 s; single items → L2 10 min / L1 2 min.
+/// Write operations evict the affected single-item cache key immediately.
+/// Paginated list caches expire naturally via TTL (eventual consistency).
+/// </summary>
 public sealed class BusinessBranchService(
     ApplicationDbContext db,
-    IBusinessLicenseService licenseService) : IBusinessBranchService
+    IBusinessLicenseService licenseService,
+    ITwoLevelCache cache) : IBusinessBranchService
 {
-    public async Task<IReadOnlyList<BusinessBranchDto>> GetByBusinessAsync(Guid businessId, CancellationToken ct = default)
-        => await db.BusinessBranches
-            .Where(b => b.BusinessId == businessId)
-            .OrderBy(b => b.SortOrder).ThenBy(b => b.Name)
-            .Select(b => b.ToDto())
-            .ToListAsync(ct);
+    private static readonly TimeSpan ListL2Ttl = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan ListL1Ttl = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan ItemL2Ttl = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan ItemL1Ttl = TimeSpan.FromMinutes(2);
+
+    // ── Queries ───────────────────────────────────────────────────────────────
+
+    public async Task<PagedResult<BusinessBranchDto>> GetByBusinessAsync(
+        Guid businessId,
+        BranchQueryParameters query,
+        CancellationToken ct = default)
+    {
+        var cacheKey = CacheKeys.Branches(businessId, query.ToCacheSegment());
+
+        return await cache.GetOrCreateAsync(
+            cacheKey,
+            async innerCt =>
+            {
+                // ─ Base filter ──────────────────────────────────────────────
+                IQueryable<BusinessBranch> q = db.BusinessBranches
+                    .Where(b => b.BusinessId == businessId);
+
+                // ─ Optional filters ─────────────────────────────────────────
+                if (query.IsActive.HasValue)
+                    q = q.Where(b => b.IsActive == query.IsActive.Value);
+
+                if (query.IsHeadquarters.HasValue)
+                    q = q.Where(b => b.IsHeadquarters == query.IsHeadquarters.Value);
+
+                if (!string.IsNullOrWhiteSpace(query.Country))
+                    q = q.Where(b => b.Country.ToLower().Contains(query.Country.ToLower()));
+
+                if (!string.IsNullOrWhiteSpace(query.City))
+                    q = q.Where(b => b.City.ToLower().Contains(query.City.ToLower()));
+
+                if (!string.IsNullOrWhiteSpace(query.Search))
+                {
+                    var s = query.Search.ToLower();
+                    q = q.Where(b =>
+                        b.Name.ToLower().Contains(s) ||
+                        b.Code.ToLower().Contains(s) ||
+                        b.City.ToLower().Contains(s));
+                }
+
+                // ─ Sorting ──────────────────────────────────────────────────
+                q = query.SortBy?.ToLowerInvariant() switch
+                {
+                    "name"      => query.SortDesc ? q.OrderByDescending(b => b.Name)         : q.OrderBy(b => b.Name),
+                    "code"      => query.SortDesc ? q.OrderByDescending(b => b.Code)         : q.OrderBy(b => b.Code),
+                    "city"      => query.SortDesc ? q.OrderByDescending(b => b.City)         : q.OrderBy(b => b.City),
+                    "country"   => query.SortDesc ? q.OrderByDescending(b => b.Country)      : q.OrderBy(b => b.Country),
+                    "createdat" => query.SortDesc ? q.OrderByDescending(b => b.CreatedAtUtc) : q.OrderBy(b => b.CreatedAtUtc),
+                    "sortorder" => query.SortDesc ? q.OrderByDescending(b => b.SortOrder)    : q.OrderBy(b => b.SortOrder),
+                    _           => q.OrderBy(b => b.SortOrder).ThenBy(b => b.Name)
+                };
+
+                return await q.Select(b => b.ToDto()).ToPagedResultAsync(query, innerCt);
+            },
+            l2Ttl: ListL2Ttl,
+            l1Ttl: ListL1Ttl,
+            cancellationToken: ct);
+    }
 
     public async Task<BusinessBranchDto?> GetByIdAsync(Guid branchId, CancellationToken ct = default)
     {
-        var b = await db.BusinessBranches.FirstOrDefaultAsync(x => x.Id == branchId, ct);
-        return b?.ToDto();
+        // Wrap nullable result so the cache can store a definitive "not found" entry.
+        var wrapper = await cache.GetOrCreateAsync<BranchDtoWrapper>(
+            CacheKeys.BranchById(branchId),
+            async innerCt =>
+            {
+                var b = await db.BusinessBranches.FirstOrDefaultAsync(x => x.Id == branchId, innerCt);
+                return new BranchDtoWrapper(b?.ToDto());
+            },
+            l2Ttl: ItemL2Ttl,
+            l1Ttl: ItemL1Ttl,
+            cancellationToken: ct);
+
+        return wrapper.Value;
     }
+
+    // ── Commands ──────────────────────────────────────────────────────────────
 
     public async Task<BusinessBranchDto> CreateAsync(CreateBranchRequest req, CancellationToken ct = default)
     {
-        // Resolve owner for license check
         var ownership = await db.BusinessOwnerships
             .FirstOrDefaultAsync(o => o.BusinessId == req.BusinessId && o.RevokedAtUtc == null && o.IsPrimaryOwner, ct)
             ?? throw new KeyNotFoundException("Business ownership not found.");
@@ -300,31 +376,32 @@ public sealed class BusinessBranchService(
         if (!await licenseService.CanCreateBranchAsync(ownership.OwnerId, req.BusinessId, ct))
             throw new InvalidOperationException("License quota exceeded: cannot create more branches.");
 
-        // If marking as HQ, demote current HQ
         if (req.IsHeadquarters)
             await DemoteCurrentHqAsync(req.BusinessId, ct);
 
         var branch = new BusinessBranch
         {
-            Id = Guid.NewGuid(),
-            BusinessId = req.BusinessId,
-            Code = req.Code,
-            Name = req.Name,
-            Type = req.Type,
+            Id             = Guid.NewGuid(),
+            BusinessId     = req.BusinessId,
+            Code           = req.Code,
+            Name           = req.Name,
+            Type           = req.Type,
             IsHeadquarters = req.IsHeadquarters,
-            Address = req.Address,
-            City = req.City,
-            StateProvince = req.StateProvince,
-            Country = req.Country,
-            PostalCode = req.PostalCode,
-            PhoneNumber = req.PhoneNumber,
-            Email = req.Email,
-            TimezoneId = req.TimezoneId,
-            ManagerId = req.ManagerId,
-            SortOrder = req.SortOrder
+            Address        = req.Address,
+            City           = req.City,
+            StateProvince  = req.StateProvince,
+            Country        = req.Country,
+            PostalCode     = req.PostalCode,
+            PhoneNumber    = req.PhoneNumber,
+            Email          = req.Email,
+            TimezoneId     = req.TimezoneId,
+            ManagerId      = req.ManagerId,
+            SortOrder      = req.SortOrder
         };
         db.BusinessBranches.Add(branch);
         await db.SaveChangesAsync(ct);
+
+        await cache.RemoveAsync(CacheKeys.BranchById(branch.Id), ct);
         return branch.ToDto();
     }
 
@@ -333,22 +410,24 @@ public sealed class BusinessBranchService(
         var branch = await db.BusinessBranches.FirstOrDefaultAsync(x => x.Id == branchId, ct)
             ?? throw new KeyNotFoundException("Branch not found.");
 
-        branch.Name = req.Name;
-        branch.Type = req.Type;
-        branch.Address = req.Address;
-        branch.City = req.City;
+        branch.Name          = req.Name;
+        branch.Type          = req.Type;
+        branch.Address       = req.Address;
+        branch.City          = req.City;
         branch.StateProvince = req.StateProvince;
-        branch.Country = req.Country;
-        branch.PostalCode = req.PostalCode;
-        branch.PhoneNumber = req.PhoneNumber;
-        branch.Email = req.Email;
-        branch.TimezoneId = req.TimezoneId;
-        branch.ManagerId = req.ManagerId;
-        branch.SortOrder = req.SortOrder;
-        branch.IsActive = req.IsActive;
+        branch.Country       = req.Country;
+        branch.PostalCode    = req.PostalCode;
+        branch.PhoneNumber   = req.PhoneNumber;
+        branch.Email         = req.Email;
+        branch.TimezoneId    = req.TimezoneId;
+        branch.ManagerId     = req.ManagerId;
+        branch.SortOrder     = req.SortOrder;
+        branch.IsActive      = req.IsActive;
         branch.ModifiedAtUtc = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(ct);
+        await cache.RemoveAsync(CacheKeys.BranchById(branchId), ct);
+
         return branch.ToDto();
     }
 
@@ -363,10 +442,11 @@ public sealed class BusinessBranchService(
             throw new InvalidOperationException("Branch does not belong to this business.");
 
         newHq.IsHeadquarters = true;
-        newHq.Type = BranchType.Headquarters;
-        newHq.ModifiedAtUtc = DateTimeOffset.UtcNow;
+        newHq.Type           = BranchType.Headquarters;
+        newHq.ModifiedAtUtc  = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(ct);
+        await cache.RemoveAsync(CacheKeys.BranchById(newHqBranchId), ct);
     }
 
     public async Task DeleteAsync(Guid branchId, CancellationToken ct = default)
@@ -383,9 +463,62 @@ public sealed class BusinessBranchService(
         if (activeCount <= 1)
             throw new InvalidOperationException("A business must have at least one active branch.");
 
-        branch.IsActive = false;
+        branch.IsActive      = false;
         branch.ModifiedAtUtc = DateTimeOffset.UtcNow;
+
         await db.SaveChangesAsync(ct);
+        await cache.RemoveAsync(CacheKeys.BranchById(branchId), ct);
+    }
+
+    // ── Branch Employees ──────────────────────────────────────────────────────
+
+    public async Task<PagedResult<BranchEmployeeDto>> GetEmployeesAsync(
+        Guid branchId,
+        BranchEmployeeQueryParameters query,
+        CancellationToken ct = default)
+    {
+        var cacheKey = CacheKeys.BranchEmployees(branchId, query.ToCacheSegment());
+
+        return await cache.GetOrCreateAsync(
+            cacheKey,
+            async innerCt =>
+            {
+                var branch = await db.BusinessBranches.FirstOrDefaultAsync(x => x.Id == branchId, innerCt)
+                    ?? throw new KeyNotFoundException("Branch not found.");
+
+                IQueryable<BranchEmployee> q = db.BranchEmployees.Where(be => be.BranchId == branchId);
+
+                // ─ Optional filters ─────────────────────────────────────────
+                if (query.IsActive.HasValue)
+                {
+                    var today = DateOnly.FromDateTime(DateTime.UtcNow);
+                    q = query.IsActive.Value
+                        ? q.Where(be => be.ReleasedOn == null || be.ReleasedOn >= today)
+                        : q.Where(be => be.ReleasedOn != null && be.ReleasedOn < today);
+                }
+                else
+                {
+                    q = q.Where(be => be.ReleasedOn == null); // default: active only
+                }
+
+                if (query.IsPrimary.HasValue)
+                    q = q.Where(be => be.IsPrimary == query.IsPrimary.Value);
+
+                // ─ Sorting ──────────────────────────────────────────────────
+                q = query.SortBy?.ToLowerInvariant() switch
+                {
+                    "assignedon" => query.SortDesc ? q.OrderByDescending(be => be.AssignedOn) : q.OrderBy(be => be.AssignedOn),
+                    "releasedon" => query.SortDesc ? q.OrderByDescending(be => be.ReleasedOn) : q.OrderBy(be => be.ReleasedOn),
+                    "isprimary"  => query.SortDesc ? q.OrderByDescending(be => be.IsPrimary)  : q.OrderBy(be => be.IsPrimary),
+                    _            => q.OrderByDescending(be => be.IsPrimary).ThenBy(be => be.AssignedOn)
+                };
+
+                var branchName = branch.Name;
+                return await q.Select(be => be.ToDto(branchName)).ToPagedResultAsync(query, innerCt);
+            },
+            l2Ttl: ListL2Ttl,
+            l1Ttl: ListL1Ttl,
+            cancellationToken: ct);
     }
 
     public async Task<BranchEmployeeDto> AssignEmployeeAsync(Guid branchId, AssignEmployeeToBranchRequest req, CancellationToken ct = default)
@@ -393,7 +526,6 @@ public sealed class BusinessBranchService(
         var branch = await db.BusinessBranches.FirstOrDefaultAsync(x => x.Id == branchId, ct)
             ?? throw new KeyNotFoundException("Branch not found.");
 
-        // If primary: release current primary assignment for this employee across all branches
         if (req.IsPrimary)
         {
             var existing = await db.BranchEmployees
@@ -404,10 +536,10 @@ public sealed class BusinessBranchService(
 
         var assignment = new BranchEmployee
         {
-            Id = Guid.NewGuid(),
-            BranchId = branchId,
+            Id         = Guid.NewGuid(),
+            BranchId   = branchId,
             EmployeeId = req.EmployeeId,
-            IsPrimary = req.IsPrimary,
+            IsPrimary  = req.IsPrimary,
             AssignedOn = req.AssignedOn
         };
         db.BranchEmployees.Add(assignment);
@@ -425,18 +557,7 @@ public sealed class BusinessBranchService(
         await db.SaveChangesAsync(ct);
     }
 
-    public async Task<IReadOnlyList<BranchEmployeeDto>> GetEmployeesAsync(Guid branchId, CancellationToken ct = default)
-    {
-        var branch = await db.BusinessBranches.FirstOrDefaultAsync(x => x.Id == branchId, ct)
-            ?? throw new KeyNotFoundException("Branch not found.");
-
-        return await db.BranchEmployees
-            .Where(be => be.BranchId == branchId && be.ReleasedOn == null)
-            .Select(be => be.ToDto(branch.Name))
-            .ToListAsync(ct);
-    }
-
-    // ── private helpers ───────────────────────────────────────────────────────
+    // ── Private helpers ───────────────────────────────────────────────────────
 
     private async Task DemoteCurrentHqAsync(Guid businessId, CancellationToken ct)
     {
@@ -447,7 +568,12 @@ public sealed class BusinessBranchService(
         if (currentHq.Type == BranchType.Headquarters)
             currentHq.Type = BranchType.RegionalOffice;
         currentHq.ModifiedAtUtc = DateTimeOffset.UtcNow;
+        await cache.RemoveAsync(CacheKeys.BranchById(currentHq.Id), ct);
     }
+
+    // Nullable-value wrapper: lets the cache store a definitive "not found" entry
+    // rather than treating a null result as a cache miss on every call.
+    private sealed record BranchDtoWrapper(BusinessBranchDto? Value);
 }
 
 // ── BusinessSettingService ────────────────────────────────────────────────────

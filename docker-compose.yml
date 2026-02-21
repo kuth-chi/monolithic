@@ -5,7 +5,7 @@ services:
       dockerfile: src/Monolithic.Api/Dockerfile
     container_name: monolithic-api
     ports:
-      - "8080:8080"
+      - "8000:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       Infrastructure__PostgreSql__ConnectionString: Host=postgres;Port=5432;Database=monolithic;Username=postgres;Password=${POSTGRES_PASSWORD}
@@ -14,6 +14,10 @@ services:
       Infrastructure__RabbitMq__Port: 5672
       Infrastructure__RabbitMq__Username: ${RABBITMQ_DEFAULT_USER}
       Infrastructure__RabbitMq__Password: ${RABBITMQ_DEFAULT_PASS}
+      Jwt__SecretKey: ${JWT_SECRET_KEY}
+      Jwt__Issuer: identity-server
+      Jwt__Audience: web-app
+      Jwt__ExpiryMinutes: 60
     depends_on:
       postgres:
         condition: service_healthy

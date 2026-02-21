@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Monolithic.Api.Common.Pagination;
 using Monolithic.Api.Modules.Identity.Authorization;
 using Monolithic.Api.Modules.Business.Application;
 using Monolithic.Api.Modules.Business.Contracts;
@@ -9,6 +10,10 @@ namespace Monolithic.Api.Controllers.V1;
 /// <summary>
 /// Branch management within a business.
 /// Enforces: ≥1 branch, exactly one HQ, branch count ≤ license quota.
+///
+/// All list endpoints are paginated, filterable, and sortable via query parameters.
+/// Results are served from a two-level cache (L1: in-memory, L2: Redis) with
+/// write-through eviction on mutations.
 /// </summary>
 [ApiController]
 [Route("api/v1/businesses/{businessId:guid}/branches")]
@@ -21,10 +26,33 @@ public sealed class BusinessBranchesController(
             ?? User.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value,
             out var id) ? id : Guid.Empty;
 
+    /// <summary>
+    /// Returns a paginated, searchable, and sortable list of branches for the business.
+    /// </summary>
+    /// <remarks>
+    /// <b>Query parameters:</b>
+    /// <list type="bullet">
+    ///   <item><c>page</c> — 1-based page number (default: 1)</item>
+    ///   <item><c>size</c> — items per page, capped at 100 (default: 20)</item>
+    ///   <item><c>sortBy</c> — field: name | code | city | country | sortorder | createdat</item>
+    ///   <item><c>sortDesc</c> — true for descending order</item>
+    ///   <item><c>search</c> — full-text search on name, code, city</item>
+    ///   <item><c>isActive</c> — filter by active status (omit for all)</item>
+    ///   <item><c>isHeadquarters</c> — filter HQ / non-HQ branches</item>
+    ///   <item><c>country</c> — substring filter on country</item>
+    ///   <item><c>city</c> — substring filter on city</item>
+    /// </list>
+    /// </remarks>
     [HttpGet]
     [RequirePermission("business:read")]
-    public async Task<IActionResult> GetAll(Guid businessId, CancellationToken ct)
-        => Ok(await branchService.GetByBusinessAsync(businessId, ct));
+    public async Task<IActionResult> GetAll(
+        Guid businessId,
+        [FromQuery] BranchQueryParameters query,
+        CancellationToken ct)
+    {
+        var result = await branchService.GetByBusinessAsync(businessId, query, ct);
+        return Ok(result.WithNavigationUrls(Request));
+    }
 
     [HttpGet("{branchId:guid}")]
     [RequirePermission("business:read")]
@@ -72,10 +100,28 @@ public sealed class BusinessBranchesController(
 
     // ── Branch Employees ──────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Returns a paginated list of employees assigned to the branch.
+    /// </summary>
+    /// <remarks>
+    /// <b>Query parameters:</b>
+    /// <list type="bullet">
+    ///   <item><c>page</c>, <c>size</c>, <c>sortBy</c>, <c>sortDesc</c> — standard pagination</item>
+    ///   <item><c>isPrimary</c> — filter by primary/non-primary assignment</item>
+    ///   <item><c>isActive</c> — true = active assignments only (default), false = released only</item>
+    /// </list>
+    /// </remarks>
     [HttpGet("{branchId:guid}/employees")]
     [RequirePermission("business:read")]
-    public async Task<IActionResult> GetEmployees(Guid businessId, Guid branchId, CancellationToken ct)
-        => Ok(await branchService.GetEmployeesAsync(branchId, ct));
+    public async Task<IActionResult> GetEmployees(
+        Guid businessId,
+        Guid branchId,
+        [FromQuery] BranchEmployeeQueryParameters query,
+        CancellationToken ct)
+    {
+        var result = await branchService.GetEmployeesAsync(branchId, query, ct);
+        return Ok(result.WithNavigationUrls(Request));
+    }
 
     [HttpPost("{branchId:guid}/employees")]
     [RequirePermission("business:write")]
@@ -93,3 +139,4 @@ public sealed class BusinessBranchesController(
         return NoContent();
     }
 }
+

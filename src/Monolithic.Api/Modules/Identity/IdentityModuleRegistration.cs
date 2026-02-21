@@ -1,7 +1,12 @@
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.IdentityModel.Tokens;
 using Monolithic.Api.Common.Configuration;
+using Monolithic.Api.Modules.Identity.Application;
 using Monolithic.Api.Modules.Identity.Authorization;
 using Monolithic.Api.Modules.Identity.Domain;
 using Monolithic.Api.Modules.Identity.Infrastructure.Data;
@@ -29,6 +34,14 @@ public static class IdentityModuleRegistration
                 var pgConnectionString = configuration[$"{InfrastructureOptions.SectionName}:{nameof(InfrastructureOptions.PostgreSql)}:{nameof(PostgresOptions.ConnectionString)}"];
                 options.UseNpgsql(pgConnectionString);
             }
+
+            // BusinessBankAccount, CustomerBankAccount and VendorBankAccount all derive
+            // from BankAccountBase (TPH hierarchy). EF Core prohibits HasQueryFilter on
+            // derived TPH types, so their parent-filter cascade warning is unavoidable.
+            // The entities are always accessed via filtered parent navigation properties,
+            // so no orphaned rows will appear in practice.
+            options.ConfigureWarnings(w =>
+                w.Ignore(CoreEventId.PossibleIncorrectRequiredNavigationWithQueryFilterInteractionWarning));
         });
 
         // ASP.NET Core Identity
@@ -50,6 +63,39 @@ public static class IdentityModuleRegistration
 
         // Authorization handlers
         services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
+        services.AddScoped<ValidateBusinessAccessFilter>();
+
+        // Auth services
+        services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IAuthAuditLogger, AuthAuditLogger>();
+
+        // JWT configuration
+        services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
+
+        var jwtSection = configuration.GetSection(JwtOptions.SectionName);
+        var secretKey = jwtSection[nameof(JwtOptions.SecretKey)] ?? string.Empty;
+        var issuer = jwtSection[nameof(JwtOptions.Issuer)] ?? "monolithic-api";
+        var audience = jwtSection[nameof(JwtOptions.Audience)] ?? "monolithic-web";
+
+        services.AddAuthentication(options =>
+        {
+            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        })
+        .AddJwtBearer(options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = issuer,
+                ValidAudience = audience,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
+                ClockSkew = TimeSpan.Zero
+            };
+        });
 
         return services;
     }

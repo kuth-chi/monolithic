@@ -8,18 +8,42 @@ public sealed class TwoLevelCache(IMemoryCache memoryCache, IDistributedCache di
 {
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
 
-    public async Task<T> GetOrCreateAsync<T>(
+    // ── Public overloads (single TTL and explicit dual-TTL) ───────────────────
+
+    /// <inheritdoc/>
+    public Task<T> GetOrCreateAsync<T>(
         string key,
         Func<CancellationToken, Task<T>> factory,
         TimeSpan ttl,
         CancellationToken cancellationToken = default)
         where T : class
-    {
-        if (memoryCache.TryGetValue(key, out T? memoryValue) && memoryValue is not null)
-        {
-            return memoryValue;
-        }
+        => GetOrCreateCoreAsync(key, factory, l2Ttl: ttl, l1Ttl: ttl, cancellationToken);
 
+    /// <inheritdoc/>
+    public Task<T> GetOrCreateAsync<T>(
+        string key,
+        Func<CancellationToken, Task<T>> factory,
+        TimeSpan l2Ttl,
+        TimeSpan l1Ttl,
+        CancellationToken cancellationToken = default)
+        where T : class
+        => GetOrCreateCoreAsync(key, factory, l2Ttl, l1Ttl, cancellationToken);
+
+    // ── Core implementation ───────────────────────────────────────────────────
+
+    private async Task<T> GetOrCreateCoreAsync<T>(
+        string key,
+        Func<CancellationToken, Task<T>> factory,
+        TimeSpan l2Ttl,
+        TimeSpan l1Ttl,
+        CancellationToken cancellationToken)
+        where T : class
+    {
+        // L1 — in-memory (fastest, process-local)
+        if (memoryCache.TryGetValue(key, out T? memoryValue) && memoryValue is not null)
+            return memoryValue;
+
+        // L2 — distributed (Redis in production, in-memory stub in development)
         var payload = await distributedCache.GetStringAsync(key, cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(payload))
@@ -28,27 +52,27 @@ public sealed class TwoLevelCache(IMemoryCache memoryCache, IDistributedCache di
 
             if (distributedValue is not null)
             {
-                memoryCache.Set(key, distributedValue, ttl);
+                memoryCache.Set(key, distributedValue, l1Ttl); // backfill L1
                 return distributedValue;
             }
         }
 
+        // Cache miss — call factory, write to both layers
         var created = await factory(cancellationToken);
 
-        memoryCache.Set(key, created, ttl);
+        memoryCache.Set(key, created, l1Ttl);
 
         var serialized = JsonSerializer.Serialize(created, SerializerOptions);
         await distributedCache.SetStringAsync(
             key,
             serialized,
-            new DistributedCacheEntryOptions
-            {
-                AbsoluteExpirationRelativeToNow = ttl
-            },
+            new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = l2Ttl },
             cancellationToken);
 
         return created;
     }
+
+    // ── Eviction ──────────────────────────────────────────────────────────────
 
     public async Task RemoveAsync(string key, CancellationToken cancellationToken = default)
     {

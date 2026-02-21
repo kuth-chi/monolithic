@@ -20,7 +20,7 @@ public interface IEstimatePurchaseOrderService
     /// <summary>
     /// Converts an approved RFQ into a Purchase Order.
     /// </summary>
-    Task<Monolithic.Api.Modules.PurchaseOrders.Contracts.PurchaseOrderDto> ConvertToPurchaseOrderAsync(
+    Task<Monolithic.Api.Modules.Purchases.Contracts.PurchaseOrderDto> ConvertToPurchaseOrderAsync(
         Guid estimateId,
         ConvertEstimateToPurchaseOrderRequest request,
         Guid createdByUserId,

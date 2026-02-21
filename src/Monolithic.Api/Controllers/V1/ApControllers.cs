@@ -16,6 +16,7 @@ namespace Monolithic.Api.Controllers.V1;
 // ═══════════════════════════════════════════════════════════════════════════════
 [ApiController]
 [Route("api/v1/businesses/{businessId:guid}/ap")]
+[ServiceFilter(typeof(ValidateBusinessAccessFilter))]
 public sealed class ApDashboardController(IApDashboardService dashboardService) : ControllerBase
 {
     [HttpGet("dashboard")]
@@ -44,6 +45,7 @@ public sealed class ApDashboardController(IApDashboardService dashboardService) 
 // ═══════════════════════════════════════════════════════════════════════════════
 [ApiController]
 [Route("api/v1/businesses/{businessId:guid}/ap/credit-terms")]
+[ServiceFilter(typeof(ValidateBusinessAccessFilter))]
 public sealed class VendorCreditTermsController(IVendorCreditTermService service) : ControllerBase
 {
     [HttpGet]
@@ -94,6 +96,7 @@ public sealed class VendorCreditTermsController(IVendorCreditTermService service
 // ═══════════════════════════════════════════════════════════════════════════════
 [ApiController]
 [Route("api/v1/businesses/{businessId:guid}/ap/vendor-classes")]
+[ServiceFilter(typeof(ValidateBusinessAccessFilter))]
 public sealed class VendorClassesController(IVendorClassService service) : ControllerBase
 {
     [HttpGet]
@@ -144,6 +147,7 @@ public sealed class VendorClassesController(IVendorClassService service) : Contr
 // ═══════════════════════════════════════════════════════════════════════════════
 [ApiController]
 [Route("api/v1/businesses/{businessId:guid}/vendors/{vendorId:guid}/ap-profile")]
+[ServiceFilter(typeof(ValidateBusinessAccessFilter))]
 public sealed class VendorApProfileController(IVendorProfileService service) : ControllerBase
 {
     [HttpGet]
@@ -217,6 +221,7 @@ public sealed class VendorApProfileController(IVendorProfileService service) : C
 // ═══════════════════════════════════════════════════════════════════════════════
 [ApiController]
 [Route("api/v1/businesses/{businessId:guid}/ap/payment-sessions")]
+[ServiceFilter(typeof(ValidateBusinessAccessFilter))]
 public sealed class ApPaymentSessionsController(IApPaymentSessionService service) : ControllerBase
 {
     [HttpGet("vendor/{vendorId:guid}")]
@@ -291,6 +296,7 @@ public sealed class ApPaymentSessionsController(IApPaymentSessionService service
 // ═══════════════════════════════════════════════════════════════════════════════
 [ApiController]
 [Route("api/v1/businesses/{businessId:guid}/ap/credit-notes")]
+[ServiceFilter(typeof(ValidateBusinessAccessFilter))]
 public sealed class ApCreditNotesController(IApCreditNoteService service) : ControllerBase
 {
     [HttpGet("vendor/{vendorId:guid}")]
@@ -361,6 +367,7 @@ public sealed class ApCreditNotesController(IApCreditNoteService service) : Cont
 // ═══════════════════════════════════════════════════════════════════════════════
 [ApiController]
 [Route("api/v1/businesses/{businessId:guid}/ap/payment-schedules")]
+[ServiceFilter(typeof(ValidateBusinessAccessFilter))]
 public sealed class ApPaymentSchedulesController(IApPaymentScheduleService service) : ControllerBase
 {
     [HttpGet("vendor/{vendorId:guid}")]

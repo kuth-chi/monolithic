@@ -1,10 +1,12 @@
+using Monolithic.Api.Common.SoftDelete;
+
 namespace Monolithic.Api.Modules.Business.Domain;
 
 /// <summary>
 /// Represents a vendor/supplier that supplies goods to a business.
 /// Vendors are business entities from whom we purchase inventory items.
 /// </summary>
-public class Vendor : BusinessPartyBase
+public class Vendor : BusinessPartyBase, IBusinessScoped
 {
     /// <summary>
     /// The business that uses this vendor.

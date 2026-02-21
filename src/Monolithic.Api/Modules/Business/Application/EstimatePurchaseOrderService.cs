@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Monolithic.Api.Modules.Business.Contracts;
 using Monolithic.Api.Modules.Business.Domain;
 using Monolithic.Api.Modules.Identity.Infrastructure.Data;
-using Monolithic.Api.Modules.PurchaseOrders.Contracts;
+using Monolithic.Api.Modules.Purchases.Contracts;
 
 namespace Monolithic.Api.Modules.Business.Application;
 

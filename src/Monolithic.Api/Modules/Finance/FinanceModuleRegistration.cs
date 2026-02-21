@@ -24,6 +24,10 @@ public static class FinanceModuleRegistration
         // static constructor (called once per process on first use).
         services.AddScoped<IReportExportService, ReportExportService>();
 
+        // ── Expenses ─────────────────────────────────────────────────────────
+        services.AddScoped<IExpenseCategoryService, ExpenseCategoryService>();
+        services.AddScoped<IExpenseService, ExpenseService>();
+
         // ── TimeProvider abstraction (enables deterministic unit-testing) ─────
         services.TryAddSingleton(TimeProvider.System);
 

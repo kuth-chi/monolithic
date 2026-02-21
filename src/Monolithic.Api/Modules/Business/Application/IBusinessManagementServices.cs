@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Monolithic.Api.Common.Pagination;
 using Monolithic.Api.Modules.Business.Contracts;
 using Monolithic.Api.Modules.Business.Domain;
 
@@ -41,20 +42,39 @@ public interface IBusinessOwnershipService
 /// <summary>
 /// Manages branches within a single business.
 /// Enforces the "at least one HQ" invariant.
+/// All list methods are paginated, filterable, and sortable via query parameters.
+/// Results are cached using L1 (in-memory) + L2 (Redis) two-level caching.
 /// </summary>
 public interface IBusinessBranchService
 {
-    Task<IReadOnlyList<BusinessBranchDto>> GetByBusinessAsync(Guid businessId, CancellationToken ct = default);
+    /// <summary>Returns a paginated, filtered, and sorted branch list for the given business.</summary>
+    Task<PagedResult<BusinessBranchDto>> GetByBusinessAsync(
+        Guid businessId,
+        BranchQueryParameters query,
+        CancellationToken ct = default);
+
     Task<BusinessBranchDto?> GetByIdAsync(Guid branchId, CancellationToken ct = default);
     Task<BusinessBranchDto> CreateAsync(CreateBranchRequest request, CancellationToken ct = default);
     Task<BusinessBranchDto> UpdateAsync(Guid branchId, UpdateBranchRequest request, CancellationToken ct = default);
+
     /// <summary>Promotes a branch to HQ and demotes the current HQ atomically.</summary>
     Task PromoteHeadquartersAsync(Guid businessId, Guid newHqBranchId, CancellationToken ct = default);
+
     /// <summary>Soft-deletes a branch. Fails if it is the only active branch.</summary>
     Task DeleteAsync(Guid branchId, CancellationToken ct = default);
-    Task<BranchEmployeeDto> AssignEmployeeAsync(Guid branchId, AssignEmployeeToBranchRequest request, CancellationToken ct = default);
+
+    Task<BranchEmployeeDto> AssignEmployeeAsync(
+        Guid branchId,
+        AssignEmployeeToBranchRequest request,
+        CancellationToken ct = default);
+
     Task ReleaseEmployeeAsync(Guid branchId, Guid employeeId, CancellationToken ct = default);
-    Task<IReadOnlyList<BranchEmployeeDto>> GetEmployeesAsync(Guid branchId, CancellationToken ct = default);
+
+    /// <summary>Returns a paginated, filtered, and sorted employee list for the given branch.</summary>
+    Task<PagedResult<BranchEmployeeDto>> GetEmployeesAsync(
+        Guid branchId,
+        BranchEmployeeQueryParameters query,
+        CancellationToken ct = default);
 }
 
 /// <summary>

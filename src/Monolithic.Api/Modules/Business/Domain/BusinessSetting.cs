@@ -83,6 +83,16 @@ public class BusinessSetting
     /// <summary>Default report date range in days (e.g. 30 = last 30 days).</summary>
     public int DefaultReportRangeDays { get; set; } = 30;
 
+    // ── Data Retention ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Number of days a soft-deleted record is kept before the purge runner permanently removes it.
+    /// Applies to all <see cref="Monolithic.Api.Common.SoftDelete.ISoftDeletable"/> entities owned by this business/tenant.
+    /// Valid range: 1 – 3650 (10 years). Defaults to 30 days.
+    /// Set to <c>null</c> to fall back to the platform-wide system default (30 days).
+    /// </summary>
+    public int? SoftDeleteRetentionDays { get; set; }
+
     public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? ModifiedAtUtc { get; set; }
 

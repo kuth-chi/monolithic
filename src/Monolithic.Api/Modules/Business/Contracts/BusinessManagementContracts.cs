@@ -1,6 +1,50 @@
+using Monolithic.Api.Common.Pagination;
 using Monolithic.Api.Modules.Business.Domain;
 
 namespace Monolithic.Api.Modules.Business.Contracts;
+
+// ── Branch Query Parameters ─────────────────────────────────────────────────
+
+/// <summary>
+/// URL query parameters for the GET /branches list endpoint.
+/// Extends the reusable <see cref="QueryParameters"/> base with branch-specific filters.
+/// All properties are optional — unset values are not applied as filters.
+/// </summary>
+public sealed record BranchQueryParameters : QueryParameters
+{
+    /// <summary>Filter by active/inactive status. Null = return all.</summary>
+    public bool? IsActive { get; init; }
+
+    /// <summary>Return only the HQ branch (true), only non-HQ branches (false), or all (null).</summary>
+    public bool? IsHeadquarters { get; init; }
+
+    /// <summary>Case-insensitive substring filter on <c>Country</c>.</summary>
+    public string? Country { get; init; }
+
+    /// <summary>Case-insensitive substring filter on <c>City</c>.</summary>
+    public string? City { get; init; }
+
+    /// <inheritdoc/>
+    public override string ToCacheSegment() =>
+        $"{base.ToCacheSegment()}" +
+        $":ia{IsActive}:ih{IsHeadquarters}:co{Country?.ToLowerInvariant() ?? ""}:ci{City?.ToLowerInvariant() ?? ""}";
+}
+
+/// <summary>
+/// URL query parameters for the GET /branches/{branchId}/employees list endpoint.
+/// </summary>
+public sealed record BranchEmployeeQueryParameters : QueryParameters
+{
+    /// <summary>When true, returns only primary assignments; false = non-primary; null = all.</summary>
+    public bool? IsPrimary { get; init; }
+
+    /// <summary>When set, filters by whether the assignment is still active (ReleasedOn is null).</summary>
+    public bool? IsActive { get; init; }
+
+    /// <inheritdoc/>
+    public override string ToCacheSegment() =>
+        $"{base.ToCacheSegment()}:ip{IsPrimary}:ia{IsActive}";
+}
 
 /// <summary>
 /// Combined request to create a new business + assign ownership in one call.

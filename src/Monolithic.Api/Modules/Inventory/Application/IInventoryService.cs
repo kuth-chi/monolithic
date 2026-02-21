@@ -16,6 +16,9 @@ public interface IInventoryService
 
     Task<bool> DeleteItemAsync(Guid id, CancellationToken cancellationToken = default);
 
+    /// <summary>Returns items where total QuantityOnHand across all locations is at or below ReorderLevel.</summary>
+    Task<IReadOnlyCollection<InventoryItemDto>> GetLowStockItemsAsync(Guid businessId, CancellationToken cancellationToken = default);
+
     // ── Stock ──────────────────────────────────────────────────────────────
     /// <summary>Returns stock levels for all locations of a given item.</summary>
     Task<IReadOnlyCollection<StockDto>> GetStockByItemAsync(Guid inventoryItemId, CancellationToken cancellationToken = default);

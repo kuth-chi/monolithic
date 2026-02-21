@@ -670,11 +670,20 @@ namespace Monolithic.Api.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTimeOffset?>("DeletedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("DeletedByUserId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Description")
                         .HasMaxLength(2000)
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("LocalName")
@@ -729,6 +738,9 @@ namespace Monolithic.Api.Migrations
                     b.HasIndex("OwnerEmployeeId");
 
                     b.HasIndex("PrimaryContactId");
+
+                    b.HasIndex("IsDeleted", "DeletedAtUtc")
+                        .HasDatabaseName("IX_Businesses_SoftDelete");
 
                     b.ToTable("Businesses");
                 });
@@ -1135,6 +1147,9 @@ namespace Monolithic.Api.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("SoftDeleteRetentionDays")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("TimezoneId")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -1410,12 +1425,21 @@ namespace Monolithic.Api.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTimeOffset?>("DeletedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("DeletedByUserId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
@@ -1466,6 +1490,9 @@ namespace Monolithic.Api.Migrations
                     b.HasIndex("BusinessId", "CustomerCode")
                         .IsUnique()
                         .HasFilter("[CustomerCode] <> ''");
+
+                    b.HasIndex("BusinessId", "IsDeleted", "DeletedAtUtc")
+                        .HasDatabaseName("IX_Customers_SoftDelete");
 
                     b.ToTable("Customers");
                 });
@@ -2259,12 +2286,21 @@ namespace Monolithic.Api.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTimeOffset?>("DeletedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("DeletedByUserId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
@@ -2302,7 +2338,8 @@ namespace Monolithic.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BusinessId");
+                    b.HasIndex("BusinessId", "IsDeleted", "DeletedAtUtc")
+                        .HasDatabaseName("IX_Vendors_SoftDelete");
 
                     b.ToTable("Vendors");
                 });
@@ -2743,6 +2780,183 @@ namespace Monolithic.Api.Migrations
                     b.ToTable("VendorProfiles");
                 });
 
+            modelBuilder.Entity("Monolithic.Api.Modules.Finance.Domain.Expense", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("ExchangeRate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("ExpenseDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExpenseNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("PaidAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RejectionReason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("ReviewedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ReviewedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("SubmittedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TotalAmountBase")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessId", "ExpenseNumber")
+                        .IsUnique();
+
+                    b.ToTable("Expenses");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Finance.Domain.ExpenseCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("DefaultChartOfAccountId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("ExpenseCategories");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Finance.Domain.ExpenseItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("AmountBase")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("CustomerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("ExchangeRate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ExpenseCategoryId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("ExpenseDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ExpenseId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsBillable")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReceiptUrl")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpenseId");
+
+                    b.ToTable("ExpenseItems");
+                });
+
             modelBuilder.Entity("Monolithic.Api.Modules.Identity.Domain.ApplicationRole", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2756,9 +2970,25 @@ namespace Monolithic.Api.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTimeOffset?>("DeletedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("DeletedByUserId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsSystemRole")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false);
 
                     b.Property<string>("Name")
                         .HasMaxLength(256)
@@ -2770,9 +3000,13 @@ namespace Monolithic.Api.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("IsSystemRole");
+
                     b.HasIndex("NormalizedName")
                         .IsUnique()
                         .HasDatabaseName("RoleNameIndex");
+
+                    b.HasIndex("IsDeleted", "DeletedAtUtc");
 
                     b.ToTable("AspNetRoles", (string)null);
                 });
@@ -2793,6 +3027,12 @@ namespace Monolithic.Api.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTimeOffset?>("DeletedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("DeletedByUserId")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Email")
                         .HasMaxLength(256)
                         .HasColumnType("TEXT");
@@ -2806,6 +3046,11 @@ namespace Monolithic.Api.Migrations
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false);
 
                     b.Property<DateTimeOffset?>("LastLoginUtc")
                         .HasColumnType("TEXT");
@@ -2858,11 +3103,69 @@ namespace Monolithic.Api.Migrations
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
 
+                    b.HasIndex("IsDeleted", "DeletedAtUtc");
+
                     b.ToTable("AspNetUsers", (string)null);
 
                     b.HasDiscriminator<string>("UserType").HasValue("User");
 
                     b.UseTphMappingStrategy();
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Identity.Domain.AuthAuditLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("BusinessId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Event")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(45)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("PreviousBusinessId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Success")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email");
+
+                    b.HasIndex("OccurredAtUtc");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("Event", "OccurredAtUtc");
+
+                    b.ToTable("AuthAuditLogs");
                 });
 
             modelBuilder.Entity("Monolithic.Api.Modules.Identity.Domain.Permission", b =>
@@ -2905,6 +3208,39 @@ namespace Monolithic.Api.Migrations
                     b.HasIndex("PermissionId");
 
                     b.ToTable("RolePermissions");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Identity.Domain.UserBusiness", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset>("JoinedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessId");
+
+                    b.HasIndex("UserId", "BusinessId")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "IsDefault");
+
+                    b.ToTable("UserBusinesses");
                 });
 
             modelBuilder.Entity("Monolithic.Api.Modules.Identity.Domain.UserPermission", b =>
@@ -3300,6 +3636,1316 @@ namespace Monolithic.Api.Migrations
                         .IsUnique();
 
                     b.ToTable("WarehouseLocations");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Platform.FeatureFlags.Domain.FeatureFlag", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("BusinessId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("ExpiresAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MetadataJson")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Scope")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Key", "Scope", "BusinessId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("FeatureFlags");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Platform.Notifications.Domain.NotificationLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("BusinessId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Channel")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Recipient")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("SentAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Subject")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TemplateSl")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessId", "CreatedAtUtc");
+
+                    b.HasIndex("UserId", "Status");
+
+                    b.ToTable("NotificationLogs");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Platform.Templates.Domain.TemplateDefinition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ActiveVersionId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AvailableVariables")
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("BusinessId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Scope")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Slug", "Scope", "BusinessId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("TemplateDefinitions");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Platform.Templates.Domain.TemplateVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ChangeNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PlainTextFallback")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Subject")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("TemplateDefinitionId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("VersionLabel")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TemplateDefinitionId");
+
+                    b.ToTable("TemplateVersions");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Platform.Themes.Domain.ThemeProfile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BorderRadiusFull")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BorderRadiusLg")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BorderRadiusMd")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BorderRadiusSm")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("BusinessId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ColorAccent")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ColorBackground")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ColorBorder")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ColorDanger")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ColorInfo")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ColorPrimary")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ColorSecondary")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ColorSuccess")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ColorSurface")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ColorText")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ColorTextMuted")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ColorWarning")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ContentMaxWidth")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExtensionTokensJson")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FontFamily")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FontFamilyMono")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("FontScaleRatio")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FontSizeBase")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ShadowLg")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ShadowMd")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ShadowSm")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SidebarPosition")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SidebarWidth")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SpacingUnit")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("TopbarHeight")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("ThemeProfiles");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Platform.UserPreferences.Domain.UserPreference", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("BusinessId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ColorScheme")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DashboardLayoutJson")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("EmailNotificationsEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PreferredLocale")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("PreferredThemeId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PreferredTimezone")
+                        .HasMaxLength(60)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("PushNotificationsEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("SmsNotificationsEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "BusinessId")
+                        .IsUnique();
+
+                    b.ToTable("UserPreferences");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Purchases.Domain.PurchaseReturn", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("ConfirmedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ConfirmedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("CreditedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("ExchangeRate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("PurchaseOrderId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("ReturnDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReturnNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("ShippedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TotalAmountBase")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("VendorBillId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("VendorCreditNoteReference")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("VendorId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessId", "ReturnNumber")
+                        .IsUnique();
+
+                    b.ToTable("PurchaseReturns");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Purchases.Domain.PurchaseReturnItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("InventoryItemId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("PurchaseReturnId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TaxRate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PurchaseReturnId");
+
+                    b.ToTable("PurchaseReturnItems");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.ArCreditNote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("ConfirmedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ConfirmedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("CreditNoteDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CreditNoteNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("ExchangeRate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("RemainingAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("SalesInvoiceId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("SubTotal")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TotalAmountBase")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessId", "CreditNoteNumber")
+                        .IsUnique();
+
+                    b.ToTable("ArCreditNotes");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.ArCreditNoteApplication", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("AmountApplied")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("ApplicationDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("AppliedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ArCreditNoteId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("SalesInvoiceId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ArCreditNoteId");
+
+                    b.HasIndex("SalesInvoiceId");
+
+                    b.ToTable("ArCreditNoteApplications");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.ArCreditNoteItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ArCreditNoteId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("InventoryItemId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TaxRate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ArCreditNoteId");
+
+                    b.ToTable("ArCreditNoteItems");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.Quotation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("AcceptedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ConvertedToSalesOrderId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("ExchangeRate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("ExpiryDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("OrderDiscountAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OrderDiscountType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("OrderDiscountValue")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("QuotationDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("QuotationNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("RejectedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("SentAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("ShippingFee")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("SubTotal")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TermsAndConditions")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessId", "QuotationNumber")
+                        .IsUnique();
+
+                    b.ToTable("Quotations");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.QuotationItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DiscountType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("DiscountValue")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("InventoryItemId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("LineTotalAfterDiscount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("LineTotalBeforeDiscount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("QuotationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TaxRate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("QuotationId");
+
+                    b.ToTable("QuotationItems");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.SalesInvoice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("AmountDue")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("AmountPaid")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ChartOfAccountId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CustomerReference")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("DaysOverdue")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateOnly>("DueDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("ExchangeRate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("InvoiceDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("InvoiceNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("OrderDiscountAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OrderDiscountType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("OrderDiscountValue")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("SalesOrderId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("SentAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("ShippingFee")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("SubTotal")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TermsAndConditions")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TotalAmountBase")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("VoidedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SalesOrderId");
+
+                    b.HasIndex("BusinessId", "InvoiceNumber")
+                        .IsUnique();
+
+                    b.ToTable("SalesInvoices");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.SalesInvoiceItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DiscountType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("DiscountValue")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("InventoryItemId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("LineTotalAfterDiscount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("LineTotalBeforeDiscount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("SalesInvoiceId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("SalesOrderItemId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TaxRate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SalesInvoiceId");
+
+                    b.ToTable("SalesInvoiceItems");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.SalesInvoicePayment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("AmountBase")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("ExchangeRate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("PaymentDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PaymentMethod")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PaymentReference")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ReceivedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("SalesInvoiceId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SalesInvoiceId");
+
+                    b.ToTable("SalesInvoicePayments");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.SalesOrder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("ConfirmedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ConfirmedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DeliveryAddress")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("ExchangeRate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly?>("ExpectedDeliveryDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("OrderDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("OrderDiscountAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OrderDiscountType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("OrderDiscountValue")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OrderNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("QuotationId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("ShippingFee")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ShippingMethod")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("SubTotal")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TermsAndConditions")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TotalAmountBase")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessId", "OrderNumber")
+                        .IsUnique();
+
+                    b.ToTable("SalesOrders");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.SalesOrderItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DiscountType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("DiscountValue")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("InventoryItemId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("LineTotalAfterDiscount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("LineTotalBeforeDiscount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("QuantityInvoiced")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("QuotationItemId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("SalesOrderId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TaxRate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SalesOrderId");
+
+                    b.ToTable("SalesOrderItems");
                 });
 
             modelBuilder.Entity("Monolithic.Api.Modules.Business.Domain.BusinessBankAccount", b =>
@@ -4147,6 +5793,17 @@ namespace Monolithic.Api.Migrations
                     b.Navigation("VendorClass");
                 });
 
+            modelBuilder.Entity("Monolithic.Api.Modules.Finance.Domain.ExpenseItem", b =>
+                {
+                    b.HasOne("Monolithic.Api.Modules.Finance.Domain.Expense", "Expense")
+                        .WithMany("Items")
+                        .HasForeignKey("ExpenseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Expense");
+                });
+
             modelBuilder.Entity("Monolithic.Api.Modules.Identity.Domain.RolePermission", b =>
                 {
                     b.HasOne("Monolithic.Api.Modules.Identity.Domain.Permission", "Permission")
@@ -4164,6 +5821,25 @@ namespace Monolithic.Api.Migrations
                     b.Navigation("Permission");
 
                     b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Identity.Domain.UserBusiness", b =>
+                {
+                    b.HasOne("Monolithic.Api.Modules.Business.Domain.Business", "Business")
+                        .WithMany()
+                        .HasForeignKey("BusinessId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Monolithic.Api.Modules.Identity.Domain.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Business");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Monolithic.Api.Modules.Identity.Domain.UserPermission", b =>
@@ -4272,6 +5948,109 @@ namespace Monolithic.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Platform.Templates.Domain.TemplateVersion", b =>
+                {
+                    b.HasOne("Monolithic.Api.Modules.Platform.Templates.Domain.TemplateDefinition", "Definition")
+                        .WithMany("Versions")
+                        .HasForeignKey("TemplateDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Definition");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Purchases.Domain.PurchaseReturnItem", b =>
+                {
+                    b.HasOne("Monolithic.Api.Modules.Purchases.Domain.PurchaseReturn", "PurchaseReturn")
+                        .WithMany("Items")
+                        .HasForeignKey("PurchaseReturnId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PurchaseReturn");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.ArCreditNoteApplication", b =>
+                {
+                    b.HasOne("Monolithic.Api.Modules.Sales.Domain.ArCreditNote", "ArCreditNote")
+                        .WithMany("Applications")
+                        .HasForeignKey("ArCreditNoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Monolithic.Api.Modules.Sales.Domain.SalesInvoice", "SalesInvoice")
+                        .WithMany("CreditNoteApplications")
+                        .HasForeignKey("SalesInvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ArCreditNote");
+
+                    b.Navigation("SalesInvoice");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.ArCreditNoteItem", b =>
+                {
+                    b.HasOne("Monolithic.Api.Modules.Sales.Domain.ArCreditNote", "ArCreditNote")
+                        .WithMany("Items")
+                        .HasForeignKey("ArCreditNoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ArCreditNote");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.QuotationItem", b =>
+                {
+                    b.HasOne("Monolithic.Api.Modules.Sales.Domain.Quotation", "Quotation")
+                        .WithMany("Items")
+                        .HasForeignKey("QuotationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Quotation");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.SalesInvoice", b =>
+                {
+                    b.HasOne("Monolithic.Api.Modules.Sales.Domain.SalesOrder", null)
+                        .WithMany("Invoices")
+                        .HasForeignKey("SalesOrderId");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.SalesInvoiceItem", b =>
+                {
+                    b.HasOne("Monolithic.Api.Modules.Sales.Domain.SalesInvoice", "SalesInvoice")
+                        .WithMany("Items")
+                        .HasForeignKey("SalesInvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SalesInvoice");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.SalesInvoicePayment", b =>
+                {
+                    b.HasOne("Monolithic.Api.Modules.Sales.Domain.SalesInvoice", "SalesInvoice")
+                        .WithMany("Payments")
+                        .HasForeignKey("SalesInvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SalesInvoice");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.SalesOrderItem", b =>
+                {
+                    b.HasOne("Monolithic.Api.Modules.Sales.Domain.SalesOrder", "SalesOrder")
+                        .WithMany("Items")
+                        .HasForeignKey("SalesOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SalesOrder");
                 });
 
             modelBuilder.Entity("Monolithic.Api.Modules.Business.Domain.BusinessBankAccount", b =>
@@ -4473,6 +6252,11 @@ namespace Monolithic.Api.Migrations
                     b.Navigation("VendorProfiles");
                 });
 
+            modelBuilder.Entity("Monolithic.Api.Modules.Finance.Domain.Expense", b =>
+                {
+                    b.Navigation("Items");
+                });
+
             modelBuilder.Entity("Monolithic.Api.Modules.Identity.Domain.Permission", b =>
                 {
                     b.Navigation("RolePermissions");
@@ -4508,6 +6292,44 @@ namespace Monolithic.Api.Migrations
             modelBuilder.Entity("Monolithic.Api.Modules.Inventory.Domain.WarehouseLocation", b =>
                 {
                     b.Navigation("Stocks");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Platform.Templates.Domain.TemplateDefinition", b =>
+                {
+                    b.Navigation("Versions");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Purchases.Domain.PurchaseReturn", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.ArCreditNote", b =>
+                {
+                    b.Navigation("Applications");
+
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.Quotation", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.SalesInvoice", b =>
+                {
+                    b.Navigation("CreditNoteApplications");
+
+                    b.Navigation("Items");
+
+                    b.Navigation("Payments");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.SalesOrder", b =>
+                {
+                    b.Navigation("Invoices");
+
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("Monolithic.Api.Modules.Identity.Domain.Contact", b =>

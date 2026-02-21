@@ -1,10 +1,12 @@
+using Monolithic.Api.Common.SoftDelete;
+
 namespace Monolithic.Api.Modules.Business.Domain;
 
 /// <summary>
 /// Shared business-party fields for DRY modeling.
 /// Used by entities such as Business and Vendor.
 /// </summary>
-public abstract class BusinessPartyBase
+public abstract class BusinessPartyBase : ISoftDeletable
 {
     public Guid Id { get; set; }
 
@@ -31,4 +33,9 @@ public abstract class BusinessPartyBase
     public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
 
     public DateTimeOffset? ModifiedAtUtc { get; set; }
+
+    // ── ISoftDeletable ────────────────────────────────────────────────────────
+    public bool IsDeleted { get; set; }
+    public DateTimeOffset? DeletedAtUtc { get; set; }
+    public Guid? DeletedByUserId { get; set; }
 }

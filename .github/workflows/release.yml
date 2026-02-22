@@ -109,7 +109,7 @@ jobs:
   #         Skipped automatically if validate-tag is skipped or fails.
   # ───────────────────────────────────────────────────────────────────────────
   test:
-    name: Build & Test (.NET ${{ env.DOTNET_VERSION }})
+    name: Build & Test (.NET 10.0.x)
     runs-on: ubuntu-latest
     needs: validate-tag
 

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Scalar.AspNetCore;
 using Monolithic.Api.Common.BackgroundServices;
 using Monolithic.Api.Common.Caching;
 using Monolithic.Api.Common.Configuration;
@@ -115,6 +116,11 @@ public static class ServiceCollectionExtensions
         if (environment.IsDevelopment())
         {
             app.MapOpenApi();
+            app.MapScalarApiReference(options =>
+            {
+                options.Title = "Monolithic API";
+                options.Theme = ScalarTheme.DeepSpace;
+            });
         }
 
         // Serve uploaded images from wwwroot/images/

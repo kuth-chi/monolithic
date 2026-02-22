@@ -21,6 +21,7 @@
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.3" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
     <PackageReference Include="QuestPDF" Version="2026.2.1" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.12.46" />
     <PackageReference Include="Scriban" Version="6.5.3" />
   </ItemGroup>
 

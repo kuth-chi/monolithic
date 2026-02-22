@@ -1,0 +1,162 @@
+name: Release — Build, Test & Push to Docker Hub
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TRIGGERS
+#   • GitHub Release published on the main branch  (primary path)
+#     — Create a release in the GitHub UI targeting the main branch.
+#     — The release tag must follow semver: v1.2.3 (stable) or v1.2.3-rc.1 (pre-release)
+#     — Both jobs guard against non-main releases via `if:` conditions.
+#   • Manual dispatch from the GitHub Actions UI  (re-publish / hotfix)
+#
+# Tag naming convention:
+#   v1.0.0          stable release
+#   v1.0.1          patch release
+#   v1.1.0-rc.1     release candidate  (pre-release — "latest" NOT updated)
+#   v2.0.0-beta.1   beta               (pre-release)
+# ─────────────────────────────────────────────────────────────────────────────
+on:
+  release:
+    types: [published]    # fires only when a GitHub Release is published
+
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Reason for manual trigger (optional)"
+        required: false
+        default: "Manual release"
+
+# Cancel any previous in-progress run for the same ref (tag)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOCKERHUB_IMAGE: kuthchi/monolithic-api
+  DOTNET_VERSION: "10.0.x"
+
+# ─────────────────────────────────────────────────────────────────────────────
+jobs:
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # JOB 1 — Build & test the .NET solution
+  #         Guard: runs only when the release targets the main branch.
+  # ───────────────────────────────────────────────────────────────────────────
+  test:
+    name: Build & Test (.NET 10.0.x)
+    runs-on: ubuntu-latest
+    # Allow manual dispatch to bypass the branch check
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'release' && github.event.release.target_commitish == 'main')
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+
+      - name: Setup .NET ${{ env.DOTNET_VERSION }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore NuGet packages
+        run: dotnet restore Monolithic.slnx
+
+      - name: Build — Release
+        run: dotnet build Monolithic.slnx --configuration Release --no-restore
+
+      - name: Run tests
+        run: dotnet test Monolithic.slnx --configuration Release --no-build --verbosity normal
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # JOB 2 — Build Docker image and push to Docker Hub
+  #         Runs only when the test job succeeds AND release targets main.
+  #
+  # IMAGE TAGGING STRATEGY
+  # ──────────────────────
+  # Stable release  v1.2.3  produces:
+  #
+  #   kuthchi/monolithic-api:1.2.3      exact version   (immutable, auditable)
+  #   kuthchi/monolithic-api:1.2        minor floating  (latest patch of 1.2.x)
+  #   kuthchi/monolithic-api:1          major floating  (latest of 1.x.x)
+  #   kuthchi/monolithic-api:latest     global latest   (stable releases only)
+  #   kuthchi/monolithic-api:sha-abc123 short SHA       (exact build traceability)
+  #
+  # Pre-release  v1.2.3-rc.1  produces:
+  #
+  #   kuthchi/monolithic-api:1.2.3-rc.1  exact pre-release version
+  #   kuthchi/monolithic-api:sha-abc123   short SHA
+  #   (major / minor / latest tags are NOT updated for pre-releases)
+  # ───────────────────────────────────────────────────────────────────────────
+  docker-release:
+    name: Docker Build & Push
+    runs-on: ubuntu-latest
+    needs: test
+    # Mirror the same guard as the test job
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'release' && github.event.release.target_commitish == 'main')
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+
+      # docker/metadata-action derives tags and OCI labels from the Git context.
+      # For a GitHub Release, github.ref is refs/tags/<tag>, so semver patterns
+      # resolve automatically. latest=auto → sets "latest" only for stable releases.
+      - name: Compute Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKERHUB_IMAGE }}
+          flavor: |
+            latest=auto
+          tags: |
+            # Full semver:  1.2.3  or  1.2.3-rc.1
+            type=semver,pattern={{version}}
+
+            # Minor float:  1.2  (stable tags only — auto-skipped for pre-releases)
+            type=semver,pattern={{major}}.{{minor}}
+
+            # Major float:  1  (stable tags only — auto-skipped for pre-releases)
+            type=semver,pattern={{major}}
+
+            # Short SHA:  sha-abc1234  (every build — useful for rollbacks)
+            type=sha,prefix=sha-,format=short
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build once, push all computed tags in a single layer-cached pass
+      - name: Build & push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/Monolithic.Api/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Print published tags as a job summary in the GitHub Actions UI
+      - name: Job summary
+        run: |
+          echo "## Docker Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| GitHub Release | \`${{ github.event.release.name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Release tag    | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Target branch  | \`${{ github.event.release.target_commitish }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit SHA     | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Published Docker tags:**" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

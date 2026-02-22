@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using System.Text.Json;
-using Monolithic.Api.Modules.Identity.Infrastructure.Data;
 using Monolithic.Api.Modules.Platform.Core.Abstractions;
 using Monolithic.Api.Modules.Platform.FeatureFlags.Contracts;
 using Monolithic.Api.Modules.Platform.FeatureFlags.Domain;
@@ -30,7 +29,7 @@ public interface IFeatureFlagService
 
 // ═══════════════════════════════════════════════════════════════════════════════
 public sealed class FeatureFlagService(
-    ApplicationDbContext db,
+    IPlatformDbContext db,
     IDistributedCache cache,
     ILogger<FeatureFlagService> logger) : IFeatureFlagService
 {

@@ -1,13 +1,15 @@
+using Monolithic.Api.Common.Domain;
+
 namespace Monolithic.Api.Modules.Inventory.Domain;
 
 /// <summary>
 /// Represents an inventory item / product SKU (the catalogue entry).
 /// Actual stock quantities are tracked per warehouse location via <see cref="Stock"/>.
+/// Inherits <see cref="AuditableEntity"/> for Id, CreatedAtUtc, ModifiedAtUtc,
+/// CreatedByUserId and ModifiedByUserId.
 /// </summary>
-public class InventoryItem
+public class InventoryItem : AuditableEntity
 {
-    public Guid Id { get; set; }
-
     /// <summary>
     /// The business this inventory item belongs to.
     /// </summary>
@@ -54,10 +56,6 @@ public class InventoryItem
     public decimal SellingPrice { get; set; }
 
     public bool IsActive { get; set; } = true;
-
-    public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
-
-    public DateTimeOffset? ModifiedAtUtc { get; set; }
 
     /// <summary>
     /// Navigation: per-location stock records for this item.

@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Monolithic.Api.Modules.Identity.Infrastructure.Data;
+using Monolithic.Api.Modules.Platform.Core.Abstractions;
 using Monolithic.Api.Modules.Platform.Templates.Contracts;
 using Monolithic.Api.Modules.Platform.Templates.Domain;
 using Scriban;
@@ -27,7 +27,7 @@ namespace Monolithic.Api.Modules.Platform.Templates.Application;
 /// </summary>
 // ═══════════════════════════════════════════════════════════════════════════════
 public sealed class ScribanTemplateRenderService(
-    ApplicationDbContext db,
+    IPlatformDbContext db,
     ILogger<ScribanTemplateRenderService> logger) : ITemplateRenderService
 {
     public async Task<RenderTemplateResult> RenderAsync(

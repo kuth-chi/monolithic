@@ -1,4 +1,4 @@
-# monolithic
+# SMERP Business Management Platform - ASP.NET Core Web API (Controllers)
 
 Backend source code for the monolithic business management platform, built with **ASP.NET Core Web API (Controllers)** on **.NET 10**.
 

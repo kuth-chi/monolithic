@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using System.Text.Json;
 using Monolithic.Api.Common.Pagination;
-using Monolithic.Api.Modules.Identity.Infrastructure.Data;
 using Monolithic.Api.Modules.Platform.Core.Abstractions;
 using Monolithic.Api.Modules.Platform.Templates.Contracts;
 using Monolithic.Api.Modules.Platform.Templates.Domain;
@@ -17,7 +16,7 @@ namespace Monolithic.Api.Modules.Platform.Templates.Application;
 /// </summary>
 // ═══════════════════════════════════════════════════════════════════════════════
 public sealed class TemplateService(
-    ApplicationDbContext db,
+    IPlatformDbContext db,
     IDistributedCache cache,
     ILogger<TemplateService> logger) : ITemplateService
 {

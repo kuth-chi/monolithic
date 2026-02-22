@@ -2,18 +2,18 @@ using System.Linq.Expressions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Monolithic.Api.Common.Data;
 using Monolithic.Api.Common.SoftDelete;
 using Monolithic.Api.Modules.Identity.Domain;
 using BusinessDomain = Monolithic.Api.Modules.Business.Domain;
 using Monolithic.Api.Modules.Inventory.Domain;
-using PlatformDomain = Monolithic.Api.Modules.Platform;
 using SalesDomain = Monolithic.Api.Modules.Sales.Domain;
 using FinanceDomain = Monolithic.Api.Modules.Finance.Domain;
 using PurchaseOrdersDomain = Monolithic.Api.Modules.Purchases.Domain;
 
 namespace Monolithic.Api.Modules.Identity.Infrastructure.Data;
 
-public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>
+public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>, IApplicationDbContext
 {
     // Identity
     public DbSet<Permission> Permissions => Set<Permission>();
@@ -123,26 +123,6 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
     public DbSet<InventoryItemVariantAttribute> InventoryItemVariantAttributes => Set<InventoryItemVariantAttribute>();
 
     public DbSet<InventoryItemImage> InventoryItemImages => Set<InventoryItemImage>();
-
-    // ── Platform Foundation ───────────────────────────────────────────────────
-
-    public DbSet<PlatformDomain.Templates.Domain.TemplateDefinition> TemplateDefinitions
-        => Set<PlatformDomain.Templates.Domain.TemplateDefinition>();
-
-    public DbSet<PlatformDomain.Templates.Domain.TemplateVersion> TemplateVersions
-        => Set<PlatformDomain.Templates.Domain.TemplateVersion>();
-
-    public DbSet<PlatformDomain.Themes.Domain.ThemeProfile> ThemeProfiles
-        => Set<PlatformDomain.Themes.Domain.ThemeProfile>();
-
-    public DbSet<PlatformDomain.UserPreferences.Domain.UserPreference> UserPreferences
-        => Set<PlatformDomain.UserPreferences.Domain.UserPreference>();
-
-    public DbSet<PlatformDomain.FeatureFlags.Domain.FeatureFlag> FeatureFlags
-        => Set<PlatformDomain.FeatureFlags.Domain.FeatureFlag>();
-
-    public DbSet<PlatformDomain.Notifications.Domain.NotificationLog> NotificationLogs
-        => Set<PlatformDomain.Notifications.Domain.NotificationLog>();
 
     // ── Sales Module ──────────────────────────────────────────────────────────
     public DbSet<SalesDomain.Quotation> Quotations => Set<SalesDomain.Quotation>();
@@ -1514,72 +1494,6 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
 
             // Fast lookup for the default-business resolution on login
             entity.HasIndex(e => new { e.UserId, e.IsDefault });
-        });
-
-        // ── Platform Foundation ───────────────────────────────────────────────
-
-        // TemplateDefinition
-        modelBuilder.Entity<PlatformDomain.Templates.Domain.TemplateDefinition>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Slug).HasMaxLength(200).IsRequired();
-            entity.Property(e => e.DisplayName).HasMaxLength(300).IsRequired();
-            entity.Property(e => e.AvailableVariables).HasMaxLength(2000);
-            entity.HasIndex(e => new { e.Slug, e.Scope, e.BusinessId, e.UserId }).IsUnique();
-            entity.HasMany(e => e.Versions)
-                .WithOne(v => v.Definition)
-                .HasForeignKey(v => v.TemplateDefinitionId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        // TemplateVersion
-        modelBuilder.Entity<PlatformDomain.Templates.Domain.TemplateVersion>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.VersionLabel).HasMaxLength(20).IsRequired();
-            entity.Property(e => e.ChangeNotes).HasMaxLength(1000);
-        });
-
-        // ThemeProfile
-        modelBuilder.Entity<PlatformDomain.Themes.Domain.ThemeProfile>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Name).HasMaxLength(100).IsRequired();
-            entity.HasIndex(e => new { e.BusinessId, e.Name }).IsUnique();
-            entity.Property(e => e.ColorPrimary).HasMaxLength(20);
-            entity.Property(e => e.ColorSecondary).HasMaxLength(20);
-            entity.Property(e => e.ColorAccent).HasMaxLength(20);
-            entity.Property(e => e.FontFamily).HasMaxLength(200);
-        });
-
-        // UserPreference
-        modelBuilder.Entity<PlatformDomain.UserPreferences.Domain.UserPreference>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => new { e.UserId, e.BusinessId }).IsUnique();
-            entity.Property(e => e.ColorScheme).HasMaxLength(20);
-            entity.Property(e => e.PreferredLocale).HasMaxLength(20);
-            entity.Property(e => e.PreferredTimezone).HasMaxLength(60);
-        });
-
-        // FeatureFlag
-        modelBuilder.Entity<PlatformDomain.FeatureFlags.Domain.FeatureFlag>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Key).HasMaxLength(200).IsRequired();
-            entity.Property(e => e.DisplayName).HasMaxLength(300);
-            entity.HasIndex(e => new { e.Key, e.Scope, e.BusinessId, e.UserId }).IsUnique();
-        });
-
-        // NotificationLog
-        modelBuilder.Entity<PlatformDomain.Notifications.Domain.NotificationLog>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Recipient).HasMaxLength(500).IsRequired();
-            entity.Property(e => e.TemplateSl).HasMaxLength(200).IsRequired();
-            entity.Property(e => e.Subject).HasMaxLength(500);
-            entity.HasIndex(e => new { e.BusinessId, e.CreatedAtUtc });
-            entity.HasIndex(e => new { e.UserId, e.Status });
         });
 
         // ── Sales Module ──────────────────────────────────────────────────────

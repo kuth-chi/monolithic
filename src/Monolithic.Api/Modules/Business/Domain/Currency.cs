@@ -2,10 +2,13 @@ namespace Monolithic.Api.Modules.Business.Domain;
 
 /// <summary>
 /// ISO 4217 currency definition.
+/// Uses string PK (<see cref="Code"/>), not a surrogate GUID.
+/// Audit timestamps are kept as direct properties to avoid PK collision
+/// with <c>AuditableEntity.Id</c>.
 /// </summary>
 public class Currency
 {
-    /// <summary>ISO 4217 code, e.g. "USD", "EUR", "KHR".</summary>
+    /// <summary>ISO 4217 code, e.g. "USD", "EUR", "KHR". Acts as the PK.</summary>
     public string Code { get; set; } = string.Empty;
 
     /// <summary>Display symbol, e.g. "$", "€", "៛".</summary>

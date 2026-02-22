@@ -1,5 +1,6 @@
 using Monolithic.Api.Modules.Platform.Core.Abstractions;
 using Monolithic.Api.Modules.Platform.Core.Infrastructure;
+using Monolithic.Api.Modules.Platform.Infrastructure;
 using Monolithic.Api.Modules.Platform.Templates.Application;
 using Monolithic.Api.Modules.Platform.Themes.Application;
 using Monolithic.Api.Modules.Platform.Themes.Contracts;
@@ -24,10 +25,44 @@ public static class PlatformStartup
 
         logger.LogInformation("[Platform] Running startup initialization...");
 
+        // ── Step 1: Migrate all module databases before seeding data ──────────
+        var config = sp.GetRequiredService<IConfiguration>();
+        await ModuleDatabaseInitializer.MigrateAllAsync(scope, config, logger);
+
+        // ── Step 2: Module first-run hooks (seed reference data) ──────────────
+        await RunModuleFirstRunHooksAsync(scope);
         await SeedDefaultTemplatesAsync(scope);
         await SeedSystemThemeAsync(scope);
 
         logger.LogInformation("[Platform] Startup initialization complete.");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    /// <summary>
+    /// Calls <see cref="IModule.OnFirstRunAsync"/> for every registered module
+    /// so each module can seed its own reference data on fresh installations.
+    /// Runs in topological order (same order as registration).
+    /// </summary>
+    private static async Task RunModuleFirstRunHooksAsync(IServiceScope scope)
+    {
+        var registry = scope.ServiceProvider.GetRequiredService<ModuleRegistry>();
+        var logger   = scope.ServiceProvider.GetRequiredService<ILogger<PlatformFoundationMarker>>();
+
+        foreach (var module in registry.Modules)
+        {
+            try
+            {
+                logger.LogDebug("[Platform] Running OnFirstRunAsync for module: {Id}", module.ModuleId);
+                await module.OnFirstRunAsync(scope.ServiceProvider);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex,
+                    "[Platform] OnFirstRunAsync failed for module '{Id}'. " +
+                    "This is non-fatal — the system will continue, but module data may be incomplete.",
+                    module.ModuleId);
+            }
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────

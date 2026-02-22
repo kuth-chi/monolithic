@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Monolithic.Api.Common.Pagination;
-using Monolithic.Api.Modules.Identity.Infrastructure.Data;
+using Monolithic.Api.Modules.Platform.Core.Abstractions;
 using Monolithic.Api.Modules.Platform.Notifications.Contracts;
 using Monolithic.Api.Modules.Platform.Notifications.Domain;
 using Monolithic.Api.Modules.Platform.Templates.Application;
@@ -38,7 +38,7 @@ public interface INotificationService
 
 // ═══════════════════════════════════════════════════════════════════════════════
 public sealed class NotificationService(
-    ApplicationDbContext db,
+    IPlatformDbContext db,
     ITemplateRenderService renderer,
     IEnumerable<INotificationChannel> channels,
     ILogger<NotificationService> logger) : INotificationService

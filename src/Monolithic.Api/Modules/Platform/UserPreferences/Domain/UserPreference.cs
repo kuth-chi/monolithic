@@ -2,6 +2,54 @@ using System.Text.Json;
 
 namespace Monolithic.Api.Modules.Platform.UserPreferences.Domain;
 
+// ─────────────────────────────────────────────────────────────────────────────
+/// <summary>
+/// Validates IANA timezone identifiers using the host OS timezone database.
+/// On Linux/macOS this resolves IANA IDs directly; on Windows it uses the
+/// .NET 6+ cross-platform timezone mapping.
+/// </summary>
+// ─────────────────────────────────────────────────────────────────────────────
+public static class TimezoneValidator
+{
+    private const int MinPageSize = 5;
+    private const int MaxPageSize = 100;
+
+    /// <summary>
+    /// Returns <c>true</c> when <paramref name="timezoneId"/> is a valid
+    /// IANA or Windows timezone recognised by the runtime.
+    /// </summary>
+    public static bool IsValid(string? timezoneId)
+    {
+        if (string.IsNullOrWhiteSpace(timezoneId)) return false;
+        try
+        {
+            TimeZoneInfo.FindSystemTimeZoneById(timezoneId);
+            return true;
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Validates <paramref name="pageSize"/> is within allowed bounds [5–100].</summary>
+    public static bool IsValidPageSize(int pageSize)
+        => pageSize is >= MinPageSize and <= MaxPageSize;
+
+    /// <summary>Returns all IANA/system timezone IDs available on the host.</summary>
+    public static IReadOnlyList<TimezoneInfo> GetAll()
+        => TimeZoneInfo.GetSystemTimeZones()
+            .Select(tz => new TimezoneInfo(tz.Id, tz.DisplayName, tz.BaseUtcOffset))
+            .OrderBy(t => t.UtcOffset)
+            .ThenBy(t => t.Id)
+            .ToList();
+}
+
+/// <summary>Summary info for a single timezone entry returned from the discovery endpoint.</summary>
+public sealed record TimezoneInfo(string Id, string DisplayName, TimeSpan UtcOffset);
+
+
+
 // ═══════════════════════════════════════════════════════════════════════════════
 /// <summary>
 /// Per-user preferences scoped to a business.
@@ -49,6 +97,14 @@ public class UserPreference
     /// Flexible: any widget can add its own placement config here.
     /// </summary>
     public string? DashboardLayoutJson { get; set; }
+
+    // ── Pagination preference ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// User's preferred page size for all paginated lists.
+    /// Must be between 5 and 100. Defaults to 20.
+    /// </summary>
+    public int DefaultPageSize { get; set; } = 20;
 
     // ── Notification preferences ──────────────────────────────────────────────
 

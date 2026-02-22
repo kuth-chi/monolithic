@@ -2,17 +2,28 @@ name: Release — Build, Test & Push to Docker Hub
 
 # ─────────────────────────────────────────────────────────────────────────────
 # TRIGGERS
-#   • GitHub Release published on the main branch  (primary path)
-#     — Create a release in the GitHub UI targeting the main branch.
-#     — The release tag must follow semver: v1.2.3 (stable) or v1.2.3-rc.1 (pre-release)
-#     — Both jobs guard against non-main releases via `if:` conditions.
+#   • GitHub Release published targeting the main branch  (primary path)
+#     — Create the release in the GitHub UI, set the target branch to main.
+#     — Tag MUST be strict semver: v1.2.3 (stable) or v1.2.3-rc.1 (pre-release).
+#     — Job 0 (validate-tag) enforces the format and fails fast on bad tags.
 #   • Manual dispatch from the GitHub Actions UI  (re-publish / hotfix)
 #
-# Tag naming convention:
-#   v1.0.0          stable release
-#   v1.0.1          patch release
-#   v1.1.0-rc.1     release candidate  (pre-release — "latest" NOT updated)
-#   v2.0.0-beta.1   beta               (pre-release)
+# SEMVER CHEAT-SHEET
+# ──────────────────
+#   v0.0.x   PATCH  — bug fix, security patch, typo correction
+#   v0.x.0   MINOR  — new feature, new endpoint  (backward-compatible)
+#   vx.0.0   MAJOR  — breaking change (renamed/removed API, auth flow change)
+#
+#   v1.2.3-rc.1    release candidate  → pre-release, "latest" NOT moved
+#   v1.2.3-beta.1  beta               → pre-release, "latest" NOT moved
+#
+# JOB PIPELINE
+# ────────────
+#   validate-tag  →  test  →  docker-release
+#
+#   validate-tag   verifies strict semver, exposes `version` + `is_prerelease`
+#   test           restores, builds, and runs the full test suite
+#   docker-release builds the image, applies all semver tags, pushes to Docker Hub
 # ─────────────────────────────────────────────────────────────────────────────
 on:
   release:
@@ -25,7 +36,11 @@ on:
         required: false
         default: "Manual release"
 
-# Cancel any previous in-progress run for the same ref (tag)
+# Least-privilege: jobs only need to read repo contents.
+permissions:
+  contents: read
+
+# Cancel any previous in-progress run for the same ref (tag).
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -38,16 +53,65 @@ env:
 jobs:
 
   # ───────────────────────────────────────────────────────────────────────────
-  # JOB 1 — Build & test the .NET solution
-  #         Guard: runs only when the release targets the main branch.
+  # JOB 0 — Validate the semver tag
+  #
+  # • Enforces strict vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-pre.N format.
+  # • Fails fast with a clear error before any build work starts.
+  # • Guards the entire pipeline: downstream jobs skip when this is skipped.
+  # • Exposes two outputs consumed by docker-release:
+  #     version        e.g. "1.2.3" or "1.2.3-rc.1"  (v-prefix stripped)
+  #     is_prerelease  "true" | "false"
   # ───────────────────────────────────────────────────────────────────────────
-  test:
-    name: Build & Test (.NET 10.0.x)
+  validate-tag:
+    name: Validate Semver Tag
     runs-on: ubuntu-latest
-    # Allow manual dispatch to bypass the branch check
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'release' && github.event.release.target_commitish == 'main')
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+      is_prerelease: ${{ steps.parse.outputs.is_prerelease }}
+
+    steps:
+      - name: Parse & validate semver tag
+        id: parse
+        run: |
+          TAG="${{ github.ref_name }}"
+
+          # Strict semver: vMAJOR.MINOR.PATCH  or  vMAJOR.MINOR.PATCH-identifier.N
+          SEMVER_RE='^v([0-9]+)\.([0-9]+)\.([0-9]+)(-[a-zA-Z][a-zA-Z0-9]*(\.[0-9]+)*)?$'
+
+          if [[ ! "$TAG" =~ $SEMVER_RE ]]; then
+            echo "::error::Tag '$TAG' is not valid semver."
+            echo "::error::Expected: v1.2.3 (stable) or v1.2.3-rc.1 / v1.2.3-beta.2 (pre-release)"
+            echo "::error::Rules — PATCH: fixes | MINOR: new features | MAJOR: breaking changes"
+            exit 1
+          fi
+
+          VERSION="${TAG#v}"    # strip leading 'v'
+
+          IS_PRERELEASE="false"
+          if [[ "$TAG" =~ -[a-zA-Z] ]]; then
+            IS_PRERELEASE="true"
+          fi
+
+          echo "version=$VERSION"            >> "$GITHUB_OUTPUT"
+          echo "is_prerelease=$IS_PRERELEASE" >> "$GITHUB_OUTPUT"
+
+          if [[ "$IS_PRERELEASE" == "true" ]]; then
+            echo "Pre-release: $VERSION  (latest tag will NOT be updated)"
+          else
+            echo "Stable release: $VERSION  (latest tag WILL be updated)"
+          fi
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # JOB 1 — Build & test the .NET solution
+  #         Skipped automatically if validate-tag is skipped or fails.
+  # ───────────────────────────────────────────────────────────────────────────
+  test:
+    name: Build & Test (.NET ${{ env.DOTNET_VERSION }})
+    runs-on: ubuntu-latest
+    needs: validate-tag
 
     steps:
       - name: Checkout source
@@ -69,40 +133,35 @@ jobs:
 
   # ───────────────────────────────────────────────────────────────────────────
   # JOB 2 — Build Docker image and push to Docker Hub
-  #         Runs only when the test job succeeds AND release targets main.
+  #         Skipped automatically if validate-tag or test fails.
   #
   # IMAGE TAGGING STRATEGY
   # ──────────────────────
-  # Stable release  v1.2.3  produces:
+  # Stable release  v1.2.3  →  Docker Hub receives:
   #
-  #   kuthchi/monolithic-api:1.2.3      exact version   (immutable, auditable)
-  #   kuthchi/monolithic-api:1.2        minor floating  (latest patch of 1.2.x)
-  #   kuthchi/monolithic-api:1          major floating  (latest of 1.x.x)
-  #   kuthchi/monolithic-api:latest     global latest   (stable releases only)
-  #   kuthchi/monolithic-api:sha-abc123 short SHA       (exact build traceability)
+  #   kuthchi/monolithic-api:1.2.3      immutable exact version  ← pin this in prod
+  #   kuthchi/monolithic-api:1.2        floating minor  (latest patch of 1.2.x)
+  #   kuthchi/monolithic-api:1          floating major  (latest of 1.x.x)
+  #   kuthchi/monolithic-api:latest     always the latest stable release
+  #   kuthchi/monolithic-api:sha-abc123 exact build SHA for rollbacks
   #
-  # Pre-release  v1.2.3-rc.1  produces:
+  # Pre-release  v1.2.3-rc.1  →  Docker Hub receives:
   #
   #   kuthchi/monolithic-api:1.2.3-rc.1  exact pre-release version
-  #   kuthchi/monolithic-api:sha-abc123   short SHA
-  #   (major / minor / latest tags are NOT updated for pre-releases)
+  #   kuthchi/monolithic-api:sha-abc123   exact build SHA
+  #   (major / minor / latest are NOT updated — stable consumers unaffected)
   # ───────────────────────────────────────────────────────────────────────────
   docker-release:
     name: Docker Build & Push
     runs-on: ubuntu-latest
-    needs: test
-    # Mirror the same guard as the test job
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'release' && github.event.release.target_commitish == 'main')
+    needs: [validate-tag, test]
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v5
 
-      # docker/metadata-action derives tags and OCI labels from the Git context.
-      # For a GitHub Release, github.ref is refs/tags/<tag>, so semver patterns
-      # resolve automatically. latest=auto → sets "latest" only for stable releases.
+      # Derives all semver tags and OCI-standard labels from the Git context.
+      # latest=auto → only promoted for stable (non-pre-release) tags.
       - name: Compute Docker metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -114,14 +173,20 @@ jobs:
             # Full semver:  1.2.3  or  1.2.3-rc.1
             type=semver,pattern={{version}}
 
-            # Minor float:  1.2  (stable tags only — auto-skipped for pre-releases)
+            # Minor float:  1.2  (stable only — auto-skipped for pre-releases)
             type=semver,pattern={{major}}.{{minor}}
 
-            # Major float:  1  (stable tags only — auto-skipped for pre-releases)
+            # Major float:  1  (stable only — auto-skipped for pre-releases)
             type=semver,pattern={{major}}
 
-            # Short SHA:  sha-abc1234  (every build — useful for rollbacks)
+            # Short SHA:  sha-abc1234  (every build — rollback reference)
             type=sha,prefix=sha-,format=short
+          labels: |
+            org.opencontainers.image.title=Monolithic API
+            org.opencontainers.image.description=Monolithic business API service
+            org.opencontainers.image.version=${{ needs.validate-tag.outputs.version }}
+            org.opencontainers.image.vendor=kuth-chi
+            org.opencontainers.image.licenses=MIT
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -132,7 +197,8 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Build once, push all computed tags in a single layer-cached pass
+      # Build once, push all computed tags in a single layer-cached pass.
+      # VERSION build-arg lets the app embed its own version string at compile time.
       - name: Build & push image
         uses: docker/build-push-action@v6
         with:
@@ -141,22 +207,32 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ needs.validate-tag.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Print published tags as a job summary in the GitHub Actions UI
       - name: Job summary
         run: |
-          echo "## Docker Release Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
-          echo "| GitHub Release | \`${{ github.event.release.name }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Release tag    | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Target branch  | \`${{ github.event.release.target_commitish }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Commit SHA     | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Published Docker tags:**" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          IS_PRE="${{ needs.validate-tag.outputs.is_prerelease }}"
+          if [[ "$IS_PRE" == "true" ]]; then
+            RELEASE_TYPE="Pre-release  (latest NOT updated)"
+          else
+            RELEASE_TYPE="Stable  (latest updated)"
+          fi
+
+          echo "## Docker Release Summary"                                                          >> $GITHUB_STEP_SUMMARY
+          echo ""                                                                                    >> $GITHUB_STEP_SUMMARY
+          echo "| Field          | Value |"                                                          >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|"                                                                            >> $GITHUB_STEP_SUMMARY
+          echo "| Release type   | \`$RELEASE_TYPE\` |"                                             >> $GITHUB_STEP_SUMMARY
+          echo "| GitHub Release | \`${{ github.event.release.name }}\` |"                          >> $GITHUB_STEP_SUMMARY
+          echo "| Version        | \`${{ needs.validate-tag.outputs.version }}\` |"                 >> $GITHUB_STEP_SUMMARY
+          echo "| Release tag    | \`${{ github.ref_name }}\` |"                                    >> $GITHUB_STEP_SUMMARY
+          echo "| Target branch  | \`${{ github.event.release.target_commitish }}\` |"              >> $GITHUB_STEP_SUMMARY
+          echo "| Commit SHA     | \`${{ github.sha }}\` |"                                         >> $GITHUB_STEP_SUMMARY
+          echo ""                                                                                    >> $GITHUB_STEP_SUMMARY
+          echo "**Published Docker tags:**"                                                          >> $GITHUB_STEP_SUMMARY
+          echo '```'                                                                                 >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}"                                                     >> $GITHUB_STEP_SUMMARY
+          echo '```'                                                                                 >> $GITHUB_STEP_SUMMARY

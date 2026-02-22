@@ -1,6 +1,10 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Monolithic.Api.Common.Configuration;
 using Monolithic.Api.Modules.Platform.Core.Abstractions;
 using Monolithic.Api.Modules.Platform.Core.Infrastructure;
 using Monolithic.Api.Modules.Platform.FeatureFlags.Application;
+using Monolithic.Api.Modules.Platform.Infrastructure.Data;
 using Monolithic.Api.Modules.Platform.Notifications.Application;
 using Monolithic.Api.Modules.Platform.Notifications.Application.Channels;
 using Monolithic.Api.Modules.Platform.Templates.Application;
@@ -14,7 +18,7 @@ namespace Monolithic.Api.Modules.Platform;
 /// Registers all Platform Foundation services:
 ///
 ///  ┌─────────────────────────────────────────────────────────┐
-///  │  PLATFORM FOUNDATION                                     │
+///  │  PLATFORM FOUNDATION                                    │
 ///  │  ─────────────────────────────────────────────────────  │
 ///  │  • ModuleRegistry  – plug-and-play auto-discovery        │
 ///  │  • ITenantContext  – multi-tenant request context        │
@@ -32,10 +36,38 @@ public static class PlatformModuleRegistration
 {
     public static IServiceCollection AddPlatformModule(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IWebHostEnvironment environment)
     {
+        // ── Platform Foundation Database ──────────────────────────────────────
+        services.AddDbContext<PlatformDbContext>(options =>
+        {
+            if (environment.IsDevelopment())
+            {
+                // Share the same SQLite file in Development for simplicity.
+                // Each table lives in its own logical context but in one physical file.
+                var sqliteConn = configuration
+                    [$"{InfrastructureOptions.SectionName}:Databases:Platform:ConnectionString"]
+                    ?? configuration
+                    [$"{InfrastructureOptions.SectionName}:{nameof(InfrastructureOptions.SQLite)}:{nameof(SqliteOptions.ConnectionString)}"]
+                    ?? "Data Source=monolithic_dev.db";
+                options.UseSqlite(sqliteConn);
+            }
+            else
+            {
+                var pgConn = configuration
+                    [$"{InfrastructureOptions.SectionName}:Databases:Platform:ConnectionString"];
+                options.UseNpgsql(pgConn);
+            }
+        });
+
+        services.AddScoped<IPlatformDbContext>(
+            sp => sp.GetRequiredService<PlatformDbContext>());
+
         // ── Core infrastructure ───────────────────────────────────────────────
-        services.AddSingleton<ModuleRegistry>();
+        // ModuleRegistry is pre-built and registered by ServiceCollectionExtensions
+        // before Discover() is called; TryAdd ensures no duplicate registration.
+        services.TryAddSingleton<ModuleRegistry>();
         services.AddScoped<ITenantContext, TenantContext>();
 
         // ── Templates (Scriban engine) ────────────────────────────────────────
@@ -44,6 +76,12 @@ public static class PlatformModuleRegistration
 
         // ── Themes ────────────────────────────────────────────────────────────
         services.AddScoped<IThemeService, ThemeService>();
+        services.AddScoped<ILogoColorExtractor, LogoColorExtractor>();
+        services.AddHttpClient("logo-extractor", c =>
+        {
+            c.Timeout = TimeSpan.FromSeconds(15);
+            c.DefaultRequestHeaders.Add("User-Agent", "MonolithicApi/1.0 LogoColorExtractor");
+        });
 
         // ── User Preferences ──────────────────────────────────────────────────
         services.AddScoped<IUserPreferenceService, UserPreferenceService>();

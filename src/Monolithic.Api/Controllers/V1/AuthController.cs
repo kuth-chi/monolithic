@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Monolithic.Api.Common.Security;
 using Monolithic.Api.Modules.Identity.Application;
 using Monolithic.Api.Modules.Identity.Contracts;
 using System.Security.Claims;
@@ -32,8 +34,10 @@ public sealed class AuthController : ControllerBase
     /// roles, and effective permissions.
     /// </summary>
     [HttpPost("login")]
+    [EnableRateLimiting(RateLimitingExtensions.AuthPolicy)]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> Login(
         [FromBody] LoginRequest request,
         CancellationToken ct = default)

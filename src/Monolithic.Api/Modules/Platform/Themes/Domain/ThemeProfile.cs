@@ -84,6 +84,44 @@ public class ThemeProfile
     /// <summary>"left" or "right" sidebar position.</summary>
     public string SidebarPosition   { get; set; } = "left";
 
+    // ── Dark-mode colour overrides ────────────────────────────────────────────
+    //    When null the service auto-derives a dark-mode equivalent from the
+    //    corresponding light colour.  Setting these explicitly lets brand owners
+    //    fine-tune the dark palette without touching the light one.
+
+    public string? ColorPrimaryDark    { get; set; }
+    public string? ColorSecondaryDark  { get; set; }
+    public string? ColorAccentDark     { get; set; }
+    public string? ColorSuccessDark    { get; set; }
+    public string? ColorWarningDark    { get; set; }
+    public string? ColorDangerDark     { get; set; }
+    public string? ColorInfoDark       { get; set; }
+    public string? ColorBackgroundDark { get; set; }
+    public string? ColorSurfaceDark    { get; set; }
+    public string? ColorBorderDark     { get; set; }
+    public string? ColorTextDark       { get; set; }
+    public string? ColorTextMutedDark  { get; set; }
+
+    // ── Logo-extracted palette ────────────────────────────────────────────────
+    //    Populated automatically when the business uploads a logo.
+    //    JSON array of { "Hex": "#RRGGBB", "Percentage": 0.0–100.0 }
+    //    sorted descending by percentage.
+
+    /// <summary>
+    /// Top dominant colours extracted from the brand logo.
+    /// JSON: [{ "Hex": "#2563EB", "Percentage": 42.5 }, ...]
+    /// </summary>
+    public string? LogoExtractedColorsJson { get; set; }
+
+    /// <summary>UTC timestamp the logo extraction last ran.</summary>
+    public DateTimeOffset? LogoColorsExtractedAtUtc { get; set; }
+
+    /// <summary>
+    /// When true, primary/secondary were manually overridden AFTER auto-extraction
+    /// and the extraction service must NOT overwrite them on re-extraction.
+    /// </summary>
+    public bool LogoColorsOverridden { get; set; } = false;
+
     // ── Extensions ───────────────────────────────────────────────────────────
 
     /// <summary>
@@ -94,6 +132,6 @@ public class ThemeProfile
 
     // ── Audit ─────────────────────────────────────────────────────────────────
 
-    public DateTimeOffset CreatedAtUtc  { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset CreatedAtUtc   { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? ModifiedAtUtc { get; set; }
 }

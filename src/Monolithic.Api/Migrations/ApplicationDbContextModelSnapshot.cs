@@ -3871,20 +3871,35 @@ namespace Monolithic.Api.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ColorAccentDark")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ColorBackground")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ColorBackgroundDark")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ColorBorder")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ColorBorderDark")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ColorDanger")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ColorDangerDark")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ColorInfo")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ColorInfoDark")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ColorPrimary")
@@ -3892,29 +3907,50 @@ namespace Monolithic.Api.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ColorPrimaryDark")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ColorSecondary")
                         .IsRequired()
                         .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ColorSecondaryDark")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ColorSuccess")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ColorSuccessDark")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ColorSurface")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ColorSurfaceDark")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ColorText")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ColorTextDark")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ColorTextMuted")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ColorTextMutedDark")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ColorWarning")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ColorWarningDark")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ContentMaxWidth")
@@ -3948,6 +3984,15 @@ namespace Monolithic.Api.Migrations
 
                     b.Property<bool>("IsDefault")
                         .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset?>("LogoColorsExtractedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("LogoColorsOverridden")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("LogoExtractedColorsJson")
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
                         .HasColumnType("TEXT");

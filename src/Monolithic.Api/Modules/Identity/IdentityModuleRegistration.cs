@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.IdentityModel.Tokens;
 using Monolithic.Api.Common.Configuration;
+using Monolithic.Api.Common.Data;
 using Monolithic.Api.Modules.Identity.Application;
 using Monolithic.Api.Modules.Identity.Authorization;
 using Monolithic.Api.Modules.Identity.Domain;
@@ -21,6 +22,8 @@ public static class IdentityModuleRegistration
         IWebHostEnvironment environment)
     {
         // EF Core DbContext — SQLite in Development, PostgreSQL in Production
+        // Also registered as IApplicationDbContext so all modules can depend on the
+        // abstraction rather than the concrete infrastructure type.
         services.AddDbContext<ApplicationDbContext>(options =>
         {
             if (environment.IsDevelopment())
@@ -43,6 +46,8 @@ public static class IdentityModuleRegistration
             options.ConfigureWarnings(w =>
                 w.Ignore(CoreEventId.PossibleIncorrectRequiredNavigationWithQueryFilterInteractionWarning));
         });
+
+        services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
 
         // ASP.NET Core Identity
         services.AddIdentity<ApplicationUser, ApplicationRole>(options =>

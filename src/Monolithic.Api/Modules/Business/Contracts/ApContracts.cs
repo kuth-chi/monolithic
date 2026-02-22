@@ -50,6 +50,12 @@ public sealed record VendorClassDto(
     string Code,
     string Description,
     string ColorHex,
+    /// <summary>
+    /// Nearest Tailwind CSS v3 colour name (e.g. <c>"gray-500"</c>).
+    /// Use directly as a Tailwind class prefix: <c>bg-gray-500</c>,
+    /// <c>text-gray-500</c>, <c>border-gray-500</c>.
+    /// </summary>
+    string ColorName,
     int SortOrder,
     bool IsActive,
     DateTimeOffset CreatedAtUtc
@@ -63,6 +69,7 @@ public sealed record CreateVendorClassRequest(
     string ColorHex = "#6B7280",
     int SortOrder = 100
 );
+
 
 public sealed record UpdateVendorClassRequest(
     string Name,
@@ -93,6 +100,8 @@ public sealed record VendorProfileDto(
     Guid? VendorClassId,
     string? VendorClassName,
     string? VendorClassColorHex,
+    /// <summary>Nearest Tailwind colour name for the vendor's class badge (e.g. <c>"gray-500"</c>).</summary>
+    string? VendorClassColorName,
     decimal PerformanceRating,
     string RelationshipNotes,
     bool IsOnHold,
@@ -131,6 +140,8 @@ public sealed record VendorApSummaryDto(
     string VendorName,
     string? VendorClassName,
     string? VendorClassColorHex,
+    /// <summary>Nearest Tailwind colour name for the vendor class badge (e.g. <c>"gray-500"</c>).</summary>
+    string? VendorClassColorName,
     decimal PerformanceRating,
     bool IsOnHold,
     bool IsBlacklisted,

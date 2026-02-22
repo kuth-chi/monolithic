@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Monolithic.Api.Common.Color;
 using Monolithic.Api.Modules.Business.Contracts;
 using Monolithic.Api.Modules.Business.Domain;
 using Monolithic.Api.Modules.Identity.Infrastructure.Data;
@@ -17,7 +18,9 @@ file static class ApMapper
 
     public static VendorClassDto ToDto(this VendorClass c) => new(
         c.Id, c.BusinessId, c.Name, c.Code, c.Description,
-        c.ColorHex, c.SortOrder, c.IsActive, c.CreatedAtUtc);
+        c.ColorHex,
+        ColorName: TailwindColorPalette.Resolve(c.ColorHex),
+        c.SortOrder, c.IsActive, c.CreatedAtUtc);
 
     public static VendorProfileDto ToDto(this VendorProfile p) => new(
         p.VendorId,
@@ -34,7 +37,8 @@ file static class ApMapper
         p.MinimumPaymentAmount,
         p.VendorClassId,
         p.VendorClass?.Name,
-        p.VendorClass?.ColorHex,
+        VendorClassColorHex: p.VendorClass?.ColorHex,
+        VendorClassColorName: p.VendorClass is { } vc ? TailwindColorPalette.Resolve(vc.ColorHex) : null,
         p.PerformanceRating,
         p.RelationshipNotes,
         p.IsOnHold,
@@ -404,6 +408,7 @@ public sealed class ApDashboardService(ApplicationDbContext db) : IApDashboardSe
                     VendorName: g.First().VendorName,
                     VendorClassName: profile?.VendorClass?.Name,
                     VendorClassColorHex: profile?.VendorClass?.ColorHex,
+                    VendorClassColorName: profile?.VendorClass is { } sumVc ? TailwindColorPalette.Resolve(sumVc.ColorHex) : null,
                     PerformanceRating: profile?.PerformanceRating ?? 0,
                     IsOnHold: profile?.IsOnHold ?? false,
                     IsBlacklisted: profile?.IsBlacklisted ?? false,

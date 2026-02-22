@@ -1,12 +1,15 @@
+using Monolithic.Api.Common.Domain;
+
 namespace Monolithic.Api.Modules.Sales.Domain;
 
 /// <summary>
 /// Customer Quotation (RFQ reply / proposal).
 /// Flow: Draft → Sent → Accepted | Rejected | Expired → (Accepted) → SalesOrder (Converted).
+/// Inherits <see cref="AuditableEntity"/> for Id, CreatedAtUtc, ModifiedAtUtc,
+/// CreatedByUserId and ModifiedByUserId.
 /// </summary>
-public class Quotation
+public class Quotation : AuditableEntity
 {
-    public Guid Id { get; set; }
     public Guid BusinessId { get; set; }
     public Guid CustomerId { get; set; }
 
@@ -39,12 +42,9 @@ public class Quotation
     /// <summary>SalesOrder created when the quotation is accepted and converted.</summary>
     public Guid? ConvertedToSalesOrderId { get; set; }
 
-    public Guid? CreatedByUserId { get; set; }
     public DateTimeOffset? SentAtUtc { get; set; }
     public DateTimeOffset? AcceptedAtUtc { get; set; }
     public DateTimeOffset? RejectedAtUtc { get; set; }
-    public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
-    public DateTimeOffset? ModifiedAtUtc { get; set; }
 
     // ── Navigation ────────────────────────────────────────────────────────────
     public virtual ICollection<QuotationItem> Items { get; set; } = [];

@@ -89,7 +89,14 @@ public sealed class AppContextController(
         }
 
         // ── Key 3: Authorization ─────────────────────────────────────────────
-        var roles       = User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
+        // .NET 10 uses JsonWebTokenHandler which preserves JWT short names.
+        // "role" = the JWT short name produced when building with ClaimTypes.Role.
+        // "email" / "name" also preserved; fallbacks handle both handler variants.
+        var roles       = User.FindAll("role")
+                              .Concat(User.FindAll(ClaimTypes.Role))
+                              .Select(c => c.Value)
+                              .Distinct()
+                              .ToList();
         var permissions = User.FindAll(AppClaimTypes.Permission).Select(c => c.Value).ToList();
         var hasFullAccess   = permissions.Contains(FullAccessPermission);
         var canAccessAdmin  = hasFullAccess || AdminAccessPermissions.Any(permissions.Contains);

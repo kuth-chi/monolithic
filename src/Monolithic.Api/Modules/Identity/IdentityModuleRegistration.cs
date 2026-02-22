@@ -89,6 +89,11 @@ public static class IdentityModuleRegistration
         })
         .AddJwtBearer(options =>
         {
+            // Preserve JWT claim names as-is (e.g. "sub") without mapping to
+            // CLR URI-style claim types. Required so TenantContext.ParseGuid("sub")
+            // can locate the subject claim without string-URI indirection.
+            options.MapInboundClaims = false;
+
             options.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuer = true,

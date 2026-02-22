@@ -1,8 +1,6 @@
 services:
   api:
-    build:
-      context: .
-      dockerfile: src/Monolithic.Api/Dockerfile
+    image: kuthchi/monolithic-api:latest
     container_name: monolithic-api
     ports:
       - "8000:8080"

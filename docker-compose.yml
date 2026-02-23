@@ -2,10 +2,11 @@ services:
   api:
     image: kuthchi/monolithic-api:latest
     container_name: monolithic-api
+    restart: unless-stopped
     ports:
       - "8000:8080"
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_ENVIRONMENT: Production
       Infrastructure__PostgreSql__ConnectionString: Host=postgres;Port=5432;Database=monolithic;Username=postgres;Password=${POSTGRES_PASSWORD}
       Infrastructure__Redis__ConnectionString: redis:6379
       Infrastructure__RabbitMq__Host: rabbitmq
@@ -16,6 +17,8 @@ services:
       Jwt__Issuer: identity-server
       Jwt__Audience: web-app
       Jwt__ExpiryMinutes: 60
+      # CORS — set at least one origin so the CORS policy does not fall back to AllowAnyOrigin
+      # Cors__AllowedOrigins__0: ${FRONTEND_URL}
     depends_on:
       postgres:
         condition: service_healthy

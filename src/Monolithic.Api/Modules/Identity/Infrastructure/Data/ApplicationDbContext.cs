@@ -1727,17 +1727,58 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
     }
 
     /// <summary>
-    /// Bypasses soft-delete interception and permanently removes a row.
+    /// Bypasses soft-delete interception and permanently removes rows matching <paramref name="predicate"/>.
     /// Called exclusively by <c>SoftDeletePurgeService</c> after the retention window has expired.
-    /// Uses <c>ExecuteDeleteAsync</c> which goes directly to the database, bypassing the EF change tracker
-    /// and therefore never triggering <see cref="ApplySoftDeleteInterception"/>.
+    ///
+    /// Strategy selection:
+    /// <list type="bullet">
+    ///   <item>
+    ///     <term>Plain (non-TPH) entities</term>
+    ///     <description>
+    ///       Uses <c>ExecuteDeleteAsync</c> — a single SQL DELETE that bypasses the EF change
+    ///       tracker and never triggers <see cref="ApplySoftDeleteInterception"/>.
+    ///     </description>
+    ///   </item>
+    ///   <item>
+    ///     <term>TPH / inheritance entities (e.g. <c>ApplicationRole</c>, <c>ApplicationUser</c>)</term>
+    ///     <description>
+    ///       <c>ExecuteDelete</c> cannot be translated by EF Core for Table-Per-Hierarchy mapped
+    ///       types (ASP.NET Identity base classes).  Falls back to load → <c>RemoveRange</c> →
+    ///       <c>base.SaveChangesAsync</c>, which skips <see cref="ApplySoftDeleteInterception"/>
+    ///       so rows are truly deleted rather than re-soft-deleted.
+    ///     </description>
+    ///   </item>
+    /// </list>
     /// </summary>
     public async Task<int> HardDeleteWhereAsync<TEntity>(
         Expression<Func<TEntity, bool>> predicate,
         CancellationToken cancellationToken = default)
         where TEntity : class
     {
-        // ExecuteDeleteAsync sends DELETE directly — no change tracker, no interception
+        // Detect TPH / inheritance-mapped entities via EF model metadata.
+        // For those, ExecuteDeleteAsync cannot be translated by the SQLite provider.
+        var entityType = Model.FindEntityType(typeof(TEntity));
+        bool isInheritanceType = entityType?.BaseType is not null;
+
+        if (isInheritanceType)
+        {
+            // Load soft-deleted rows into the change tracker, mark for deletion,
+            // then persist via base.SaveChangesAsync to bypass ApplySoftDeleteInterception.
+            var rows = await Set<TEntity>()
+                .IgnoreQueryFilters()   // include already-soft-deleted rows
+                .Where(predicate)
+                .ToListAsync(cancellationToken);
+
+            if (rows.Count == 0) return 0;
+
+            RemoveRange(rows);
+            // Deliberately calling base to skip ApplySoftDeleteInterception —
+            // these rows must be truly hard-deleted, not soft-deleted again.
+            await base.SaveChangesAsync(cancellationToken);
+            return rows.Count;
+        }
+
+        // Direct SQL DELETE — bypasses change tracker and soft-delete interception entirely
         return await Set<TEntity>()
             .IgnoreQueryFilters()   // include already-soft-deleted rows
             .Where(predicate)

@@ -27,6 +27,10 @@ public static class SeedData
 
         // Seed demo businesses + user-business memberships (auto-default selection on login)
         await SeedBusinessesAndMembershipsAsync(context, userManager);
+
+        // Seed BusinessLicense + BusinessOwnership for the owner (required by /api/v1/owner/* endpoints).
+        // Called unconditionally so it runs even when UserBusiness records already exist.
+        await SeedOwnershipAndLicenseAsync(context, userManager);
     }
 
     private static async Task<Dictionary<string, Permission>> SeedPermissionsAsync(ApplicationDbContext context)
@@ -414,6 +418,80 @@ public static class SeedData
         }
 
         await context.UserBusinesses.AddRangeAsync(userBusinesses);
+        await context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Seeds a BusinessLicense for the admin owner and wires BusinessOwnership
+    /// records for every business they own.  Idempotent: skips if already present.
+    /// Called from SeedAsync directly so it executes even when UserBusiness rows
+    /// already exist (i.e. on subsequent app restarts against an existing database).
+    /// </summary>
+    private static async Task SeedOwnershipAndLicenseAsync(
+        ApplicationDbContext context,
+        UserManager<ApplicationUser> userManager)
+    {
+        // Resolve the two demo businesses by name (they must already exist)
+        var abcGroup = await context.Businesses.FirstOrDefaultAsync(b => b.Name == "ABC Group");
+        var xyzTech = await context.Businesses.FirstOrDefaultAsync(b => b.Name == "XYZ Tech");
+        if (abcGroup is null || xyzTech is null) return;  // businesses not seeded yet
+
+        Guid abcGroupId = abcGroup.Id;
+        Guid xyzTechId  = xyzTech.Id;
+        var admin = await userManager.FindByEmailAsync("admin@example.com");
+        if (admin is null) return;
+
+        // Already seeded?
+        if (await context.BusinessOwnerships.AnyAsync(o => o.OwnerId == admin.Id))
+            return;
+
+        // Create an Enterprise license for the demo owner (no expiry, full features)
+        var license = new BusinessDomain.BusinessLicense
+        {
+            Id = Guid.NewGuid(),
+            OwnerId = admin.Id,
+            Plan = BusinessDomain.LicensePlan.Enterprise,
+            Status = BusinessDomain.LicenseStatus.Active,
+            MaxBusinesses = 10,
+            MaxBranchesPerBusiness = 20,
+            MaxEmployees = 500,
+            AllowAdvancedReporting = true,
+            AllowMultiCurrency = true,
+            AllowIntegrations = true,
+            StartsOn = DateOnly.FromDateTime(DateTime.UtcNow),
+            ExpiresOn = null,
+            CreatedAtUtc = DateTimeOffset.UtcNow
+        };
+
+        await context.BusinessLicenses.AddAsync(license);
+        await context.SaveChangesAsync();
+
+        // Create ownership records for both demo businesses
+        var ownerships = new[]
+        {
+            new BusinessDomain.BusinessOwnership
+            {
+                Id = Guid.NewGuid(),
+                OwnerId = admin.Id,
+                BusinessId = abcGroupId,
+                LicenseId = license.Id,
+                IsPrimaryOwner = true,
+                GrantedAtUtc = DateTimeOffset.UtcNow,
+                RevokedAtUtc = null
+            },
+            new BusinessDomain.BusinessOwnership
+            {
+                Id = Guid.NewGuid(),
+                OwnerId = admin.Id,
+                BusinessId = xyzTechId,
+                LicenseId = license.Id,
+                IsPrimaryOwner = true,
+                GrantedAtUtc = DateTimeOffset.UtcNow,
+                RevokedAtUtc = null
+            }
+        };
+
+        await context.BusinessOwnerships.AddRangeAsync(ownerships);
         await context.SaveChangesAsync();
     }
 }

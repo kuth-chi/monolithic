@@ -37,10 +37,10 @@ public sealed class ChartOfAccountService(ApplicationDbContext context) : IChart
         return roots.Select(BuildTree).ToList();
     }
 
-    public async Task<ChartOfAccountDto?> GetByIdAsync(Guid id, CancellationToken ct = default)
+    public async Task<ChartOfAccountDto?> GetByIdAsync(Guid businessId, Guid id, CancellationToken ct = default)
     {
         var account = await context.ChartOfAccounts.AsNoTracking()
-            .Where(a => a.Id == id)
+            .Where(a => a.Id == id && a.BusinessId == businessId)
             .Include(a => a.ParentAccount)
             .Include(a => a.ChildAccounts)
             .FirstOrDefaultAsync(ct);
@@ -49,13 +49,40 @@ public sealed class ChartOfAccountService(ApplicationDbContext context) : IChart
 
     public async Task<ChartOfAccountDto> CreateAsync(CreateChartOfAccountRequest request, CancellationToken ct = default)
     {
+        if (string.IsNullOrWhiteSpace(request.AccountNumber))
+            throw new ArgumentException("Account number is required.");
+
+        if (string.IsNullOrWhiteSpace(request.Name))
+            throw new ArgumentException("Account name is required.");
+
+        var normalizedAccountNumber = request.AccountNumber.Trim();
+        var normalizedName = request.Name.Trim();
+        var normalizedDescription = request.Description?.Trim() ?? string.Empty;
+
+        var accountNumberExists = await context.ChartOfAccounts.AnyAsync(
+            a => a.BusinessId == request.BusinessId && a.AccountNumber == normalizedAccountNumber,
+            ct);
+
+        if (accountNumberExists)
+            throw new InvalidOperationException($"Account number '{normalizedAccountNumber}' already exists for this business.");
+
+        if (request.ParentAccountId.HasValue)
+        {
+            var parentExists = await context.ChartOfAccounts.AnyAsync(
+                a => a.Id == request.ParentAccountId.Value && a.BusinessId == request.BusinessId,
+                ct);
+
+            if (!parentExists)
+                throw new ArgumentException("Parent account does not exist in the current business.");
+        }
+
         var account = new ChartOfAccount
         {
             Id = Guid.NewGuid(),
             BusinessId = request.BusinessId,
-            AccountNumber = request.AccountNumber,
-            Name = request.Name,
-            Description = request.Description,
+            AccountNumber = normalizedAccountNumber,
+            Name = normalizedName,
+            Description = normalizedDescription,
             AccountType = request.AccountType,
             AccountCategory = request.AccountCategory,
             ParentAccountId = request.ParentAccountId,
@@ -67,18 +94,35 @@ public sealed class ChartOfAccountService(ApplicationDbContext context) : IChart
         };
         context.ChartOfAccounts.Add(account);
         await context.SaveChangesAsync(ct);
-        return (await GetByIdAsync(account.Id, ct))!;
+        return (await GetByIdAsync(account.BusinessId, account.Id, ct))!;
     }
 
-    public async Task<ChartOfAccountDto> UpdateAsync(Guid id, UpdateChartOfAccountRequest request, CancellationToken ct = default)
+    public async Task<ChartOfAccountDto> UpdateAsync(Guid businessId, Guid id, UpdateChartOfAccountRequest request, CancellationToken ct = default)
     {
-        var account = await context.ChartOfAccounts.FindAsync([id], ct)
+        var account = await context.ChartOfAccounts
+                      .FirstOrDefaultAsync(a => a.Id == id && a.BusinessId == businessId, ct)
                       ?? throw new KeyNotFoundException($"ChartOfAccount {id} not found.");
         if (account.IsSystem)
             throw new InvalidOperationException("System accounts cannot be modified.");
 
-        account.Name = request.Name;
-        account.Description = request.Description;
+        if (string.IsNullOrWhiteSpace(request.Name))
+            throw new ArgumentException("Account name is required.");
+
+        if (request.ParentAccountId.HasValue)
+        {
+            if (request.ParentAccountId.Value == account.Id)
+                throw new ArgumentException("An account cannot be its own parent.");
+
+            var parentExists = await context.ChartOfAccounts.AnyAsync(
+                a => a.Id == request.ParentAccountId.Value && a.BusinessId == businessId,
+                ct);
+
+            if (!parentExists)
+                throw new ArgumentException("Parent account does not exist in the current business.");
+        }
+
+        account.Name = request.Name.Trim();
+        account.Description = request.Description?.Trim() ?? string.Empty;
         account.AccountCategory = request.AccountCategory;
         account.ParentAccountId = request.ParentAccountId;
         account.IsHeaderAccount = request.IsHeaderAccount;
@@ -86,7 +130,7 @@ public sealed class ChartOfAccountService(ApplicationDbContext context) : IChart
         account.IsActive = request.IsActive;
         account.ModifiedAtUtc = DateTimeOffset.UtcNow;
         await context.SaveChangesAsync(ct);
-        return (await GetByIdAsync(id, ct))!;
+        return (await GetByIdAsync(businessId, id, ct))!;
     }
 
     // ── Standard COA Seeding ──────────────────────────────────────────────────

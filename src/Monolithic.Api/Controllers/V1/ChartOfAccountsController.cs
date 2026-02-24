@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Monolithic.Api.Modules.Identity.Authorization;
 using Monolithic.Api.Modules.Business.Application;
@@ -10,30 +11,32 @@ namespace Monolithic.Api.Controllers.V1;
 /// </summary>
 [ApiController]
 [Route("api/v1/businesses/{businessId:guid}/chart-of-accounts")]
+[Authorize]
+[ServiceFilter(typeof(ValidateBusinessAccessFilter))]
 public sealed class ChartOfAccountsController(IChartOfAccountService coaService) : ControllerBase
 {
     /// <summary>Returns the COA as a nested tree.</summary>
     [HttpGet("tree")]
-    [RequirePermission("finance:read")]
+    [RequirePermission("business:coa:read", "finance:read")]
     public async Task<IActionResult> GetTree(Guid businessId, CancellationToken ct)
         => Ok(await coaService.GetTreeAsync(businessId, ct));
 
     /// <summary>Returns the COA as a flat list (for dropdowns).</summary>
     [HttpGet]
-    [RequirePermission("finance:read")]
+    [RequirePermission("business:coa:read", "finance:read")]
     public async Task<IActionResult> GetFlat(Guid businessId, CancellationToken ct)
         => Ok(await coaService.GetFlatAsync(businessId, ct));
 
     [HttpGet("{id:guid}")]
-    [RequirePermission("finance:read")]
+    [RequirePermission("business:coa:read", "finance:read")]
     public async Task<IActionResult> GetById(Guid businessId, Guid id, CancellationToken ct)
     {
-        var result = await coaService.GetByIdAsync(id, ct);
-        return result is null || result.BusinessId != businessId ? NotFound() : Ok(result);
+        var result = await coaService.GetByIdAsync(businessId, id, ct);
+        return result is null ? NotFound() : Ok(result);
     }
 
     [HttpPost]
-    [RequirePermission("finance:write")]
+    [RequirePermission("business:coa:write", "finance:write")]
     public async Task<IActionResult> Create(Guid businessId, [FromBody] CreateChartOfAccountRequest request, CancellationToken ct)
     {
         if (request.BusinessId != businessId)
@@ -43,13 +46,13 @@ public sealed class ChartOfAccountsController(IChartOfAccountService coaService)
     }
 
     [HttpPut("{id:guid}")]
-    [RequirePermission("finance:write")]
+    [RequirePermission("business:coa:write", "finance:write")]
     public async Task<IActionResult> Update(Guid businessId, Guid id, [FromBody] UpdateChartOfAccountRequest request, CancellationToken ct)
-        => Ok(await coaService.UpdateAsync(id, request, ct));
+        => Ok(await coaService.UpdateAsync(businessId, id, request, ct));
 
     /// <summary>Seeds a standard chart of accounts for the business (1000-7999 numbered accounts).</summary>
     [HttpPost("seed")]
-    [RequirePermission("finance:write")]
+    [RequirePermission("business:coa:write", "finance:write")]
     public async Task<IActionResult> Seed(
         Guid businessId,
         [FromQuery] string baseCurrency = "USD",

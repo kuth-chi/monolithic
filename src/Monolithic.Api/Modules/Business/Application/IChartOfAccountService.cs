@@ -6,9 +6,9 @@ public interface IChartOfAccountService
 {
     Task<IReadOnlyList<ChartOfAccountDto>> GetTreeAsync(Guid businessId, CancellationToken ct = default);
     Task<IReadOnlyList<ChartOfAccountDto>> GetFlatAsync(Guid businessId, CancellationToken ct = default);
-    Task<ChartOfAccountDto?> GetByIdAsync(Guid id, CancellationToken ct = default);
+    Task<ChartOfAccountDto?> GetByIdAsync(Guid businessId, Guid id, CancellationToken ct = default);
     Task<ChartOfAccountDto> CreateAsync(CreateChartOfAccountRequest request, CancellationToken ct = default);
-    Task<ChartOfAccountDto> UpdateAsync(Guid id, UpdateChartOfAccountRequest request, CancellationToken ct = default);
+    Task<ChartOfAccountDto> UpdateAsync(Guid businessId, Guid id, UpdateChartOfAccountRequest request, CancellationToken ct = default);
 
     /// <summary>
     /// Seeds a standard Chart of Accounts for a newly created business.

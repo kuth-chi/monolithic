@@ -17,6 +17,10 @@ services:
       Jwt__Issuer: identity-server
       Jwt__Audience: web-app
       Jwt__ExpiryMinutes: 60
+      Seed__LicenseMapping__FilePath: /app/SeedData/license-mapping.json
+      Seed__LicenseMapping__DefaultPassword: ${SEED_DEFAULT_PASSWORD}
+      Seed__Bootstrap__EnableReset: ${SEED_BOOTSTRAP_ENABLE_RESET}
+      Seed__Bootstrap__ResetToken: ${SEED_BOOTSTRAP_RESET_TOKEN}
       # CORS — set at least one origin so the CORS policy does not fall back to AllowAnyOrigin
       # Cors__AllowedOrigins__0: ${FRONTEND_URL}
     depends_on:

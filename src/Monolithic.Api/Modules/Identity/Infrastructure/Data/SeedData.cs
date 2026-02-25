@@ -1,5 +1,9 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using BusinessDomain = Monolithic.Api.Modules.Business.Domain;
 using Monolithic.Api.Modules.Identity.Domain;
 
@@ -13,8 +17,15 @@ public static class SeedData
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
+        var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+        var environment = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("SeedData");
 
         await context.Database.EnsureCreatedAsync();
+
+        // Optional destructive bootstrap reset for local/dev re-install scenarios.
+        // Guarded by explicit config + confirmation token to avoid accidental data loss.
+        await TryResetBootstrapDataAsync(context, configuration, logger);
 
         // Seed Permissions
         var permissions = await SeedPermissionsAsync(context);
@@ -31,6 +42,97 @@ public static class SeedData
         // Seed BusinessLicense + BusinessOwnership for the owner (required by /api/v1/owner/* endpoints).
         // Called unconditionally so it runs even when UserBusiness records already exist.
         await SeedOwnershipAndLicenseAsync(context, userManager);
+
+        // Optional file-driven bootstrap mapping: user -> license (+ optional ownership mappings).
+        // Designed for Docker/local first-run scenarios and idempotent re-runs.
+        await ApplyLicenseMappingsFromFileAsync(
+            context,
+            userManager,
+            roleManager,
+            configuration,
+            environment,
+            logger);
+    }
+
+    private static async Task TryResetBootstrapDataAsync(
+        ApplicationDbContext context,
+        IConfiguration configuration,
+        ILogger logger)
+    {
+        var enableReset = configuration.GetValue("Seed:Bootstrap:EnableReset", false);
+        if (!enableReset) return;
+
+        var providedToken = configuration["Seed:Bootstrap:ResetToken"];
+        var expectedToken = "RESET_LOCAL_BOOTSTRAP_DATA";
+
+        if (!string.Equals(providedToken, expectedToken, StringComparison.Ordinal))
+        {
+            logger.LogWarning(
+                "[Seed] Bootstrap reset requested but token invalid. " +
+                "Set Seed:Bootstrap:ResetToken to the expected value to proceed.");
+            return;
+        }
+
+        logger.LogWarning("[Seed] Destructive bootstrap reset started (demo users/businesses/licenses only).");
+
+        var bootstrapEmails = new[]
+        {
+            "admin@example.com",
+            "sysadmin@example.com",
+            "accountant@example.com",
+            "sales@example.com",
+            "user1@example.com"
+        };
+
+        var bootstrapBusinessNames = new[] { "ABC Group", "XYZ Tech" };
+
+        var normalizedEmails = bootstrapEmails
+            .Select(e => e.Trim().ToLowerInvariant())
+            .ToHashSet();
+
+        var userIds = await context.Users
+            .Where(u => u.Email != null && normalizedEmails.Contains(u.Email.ToLower()))
+            .Select(u => u.Id)
+            .ToListAsync();
+
+        if (userIds.Count > 0)
+        {
+            var memberships = await context.UserBusinesses
+                .Where(ub => userIds.Contains(ub.UserId))
+                .ToListAsync();
+            if (memberships.Count > 0)
+            {
+                context.UserBusinesses.RemoveRange(memberships);
+                await context.SaveChangesAsync();
+            }
+
+            var ownerships = await context.BusinessOwnerships
+                .Where(o => userIds.Contains(o.OwnerId))
+                .ToListAsync();
+            if (ownerships.Count > 0)
+            {
+                context.BusinessOwnerships.RemoveRange(ownerships);
+                await context.SaveChangesAsync();
+            }
+
+            var licenses = await context.BusinessLicenses
+                .Where(l => userIds.Contains(l.OwnerId))
+                .ToListAsync();
+            if (licenses.Count > 0)
+            {
+                context.BusinessLicenses.RemoveRange(licenses);
+                await context.SaveChangesAsync();
+            }
+
+            await context.HardDeleteWhereAsync<ApplicationUser>(
+                u => u.Email != null && normalizedEmails.Contains(u.Email.ToLower()));
+        }
+
+        // Hard-delete only bootstrap demo businesses by name.
+        await context.HardDeleteWhereAsync<BusinessDomain.Business>(
+            b => bootstrapBusinessNames.Contains(b.Name));
+
+        logger.LogWarning("[Seed] Destructive bootstrap reset completed.");
     }
 
     private static async Task<Dictionary<string, Permission>> SeedPermissionsAsync(ApplicationDbContext context)
@@ -493,5 +595,288 @@ public static class SeedData
 
         await context.BusinessOwnerships.AddRangeAsync(ownerships);
         await context.SaveChangesAsync();
+    }
+
+    private static async Task ApplyLicenseMappingsFromFileAsync(
+        ApplicationDbContext context,
+        UserManager<ApplicationUser> userManager,
+        RoleManager<ApplicationRole> roleManager,
+        IConfiguration configuration,
+        IWebHostEnvironment environment,
+        ILogger logger)
+    {
+        var configuredPath = configuration["Seed:LicenseMapping:FilePath"];
+        var relativeOrAbsolutePath = string.IsNullOrWhiteSpace(configuredPath)
+            ? Path.Combine("SeedData", "license-mapping.json")
+            : configuredPath;
+
+        var fullPath = Path.IsPathRooted(relativeOrAbsolutePath)
+            ? relativeOrAbsolutePath
+            : Path.Combine(environment.ContentRootPath, relativeOrAbsolutePath);
+
+        if (!File.Exists(fullPath))
+        {
+            logger.LogInformation("[Seed] License mapping file not found at '{Path}'. Skipping file-based mapping.", fullPath);
+            return;
+        }
+
+        var json = await File.ReadAllTextAsync(fullPath);
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            logger.LogWarning("[Seed] License mapping file is empty at '{Path}'.", fullPath);
+            return;
+        }
+
+        var jsonOptions = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            ReadCommentHandling = JsonCommentHandling.Skip,
+            AllowTrailingCommas = true
+        };
+        jsonOptions.Converters.Add(new JsonStringEnumConverter());
+
+        var doc = JsonSerializer.Deserialize<LicenseMappingSeedDocument>(json, jsonOptions);
+        if (doc is null || doc.Users.Count == 0)
+        {
+            logger.LogInformation("[Seed] No user-license mappings found in '{Path}'.", fullPath);
+            return;
+        }
+
+        // Validate duplicate emails in seed file (case-insensitive)
+        var duplicateEmails = doc.Users
+            .GroupBy(u => u.Email.Trim().ToLowerInvariant())
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToList();
+
+        if (duplicateEmails.Count > 0)
+            throw new InvalidOperationException($"Duplicate email(s) in license mapping file: {string.Join(", ", duplicateEmails)}");
+
+        // Validate duplicate license keys in seed file (hashed before storing)
+        var duplicateKeys = doc.Users
+            .Where(u => !string.IsNullOrWhiteSpace(u.License.LicenseKey))
+            .Select(u => HashLicenseKey(u.License.LicenseKey))
+            .GroupBy(k => k)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToList();
+
+        if (duplicateKeys.Count > 0)
+            throw new InvalidOperationException("Duplicate license key(s) detected in license mapping file.");
+
+        var defaultPassword = configuration["Seed:LicenseMapping:DefaultPassword"];
+
+        foreach (var item in doc.Users)
+        {
+            var email = item.Email.Trim().ToLowerInvariant();
+            var user = await userManager.FindByEmailAsync(email);
+
+            if (user is null)
+            {
+                if (string.IsNullOrWhiteSpace(defaultPassword))
+                {
+                    logger.LogWarning(
+                        "[Seed] User '{Email}' not found and no Seed:LicenseMapping:DefaultPassword configured. Skipping creation.",
+                        email);
+                    continue;
+                }
+
+                var newUser = new ApplicationUser
+                {
+                    Id = Guid.NewGuid(),
+                    Email = email,
+                    UserName = email,
+                    FullName = string.IsNullOrWhiteSpace(item.FullName) ? email : item.FullName,
+                    EmailConfirmed = true,
+                    IsActive = true,
+                    CreatedAtUtc = DateTimeOffset.UtcNow
+                };
+
+                var createResult = await userManager.CreateAsync(newUser, defaultPassword);
+                if (!createResult.Succeeded)
+                {
+                    logger.LogError(
+                        "[Seed] Failed to create user '{Email}': {Errors}",
+                        email,
+                        string.Join("; ", createResult.Errors.Select(e => e.Description)));
+                    continue;
+                }
+
+                user = newUser;
+            }
+
+            // Role mapping (defaults to Owner if not specified)
+            var targetRoles = item.Roles.Count > 0 ? item.Roles : [SystemRoleNames.Owner];
+            foreach (var roleName in targetRoles.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                var role = await roleManager.FindByNameAsync(roleName);
+                if (role is null)
+                {
+                    logger.LogWarning("[Seed] Role '{Role}' not found for user '{Email}'.", roleName, email);
+                    continue;
+                }
+
+                if (!await userManager.IsInRoleAsync(user, role.Name!))
+                    await userManager.AddToRoleAsync(user, role.Name!);
+            }
+
+            var hashedLicenseKey = HashLicenseKey(item.License.LicenseKey);
+
+            // Guard: same license key cannot be mapped to multiple users
+            var conflictingOwnerId = await context.BusinessLicenses
+                .Where(l => l.ExternalSubscriptionId == hashedLicenseKey && l.OwnerId != user.Id)
+                .Select(l => (Guid?)l.OwnerId)
+                .FirstOrDefaultAsync();
+
+            if (conflictingOwnerId.HasValue)
+            {
+                logger.LogError(
+                    "[Seed] License key conflict for '{Email}'. The key is already assigned to a different owner.",
+                    email);
+                continue;
+            }
+
+            var activeLicense = await context.BusinessLicenses
+                .Where(l => l.OwnerId == user.Id && l.Status == BusinessDomain.LicenseStatus.Active)
+                .OrderByDescending(l => l.CreatedAtUtc)
+                .ToListAsync();
+
+            var license = activeLicense.FirstOrDefault();
+            if (license is null)
+            {
+                license = new BusinessDomain.BusinessLicense
+                {
+                    Id = Guid.NewGuid(),
+                    OwnerId = user.Id,
+                    CreatedAtUtc = DateTimeOffset.UtcNow
+                };
+                await context.BusinessLicenses.AddAsync(license);
+            }
+            else
+            {
+                license.ModifiedAtUtc = DateTimeOffset.UtcNow;
+            }
+
+            license.Plan = item.License.Plan;
+            license.Status = item.License.Status;
+            license.MaxBusinesses = item.License.MaxBusinesses;
+            license.MaxBranchesPerBusiness = item.License.MaxBranchesPerBusiness;
+            license.MaxEmployees = item.License.MaxEmployees;
+            license.AllowAdvancedReporting = item.License.AllowAdvancedReporting;
+            license.AllowMultiCurrency = item.License.AllowMultiCurrency;
+            license.AllowIntegrations = item.License.AllowIntegrations;
+            license.StartsOn = item.License.StartsOn;
+            license.ExpiresOn = item.License.ExpiresOn;
+            // Never persist raw keys; persist deterministic SHA-256 digest only.
+            license.ExternalSubscriptionId = hashedLicenseKey;
+
+            await context.SaveChangesAsync();
+
+            if (item.BusinessNames.Count == 0) continue;
+
+            var businesses = await context.Businesses
+                .Where(b => item.BusinessNames.Contains(b.Name))
+                .ToListAsync();
+
+            var hasDefaultMembership = await context.UserBusinesses
+                .AnyAsync(ub => ub.UserId == user.Id && ub.IsDefault);
+
+            var defaultAssigned = hasDefaultMembership;
+
+            foreach (var business in businesses)
+            {
+                var hasOwnership = await context.BusinessOwnerships
+                    .AnyAsync(o => o.OwnerId == user.Id && o.BusinessId == business.Id && o.RevokedAtUtc == null);
+
+                if (!hasOwnership)
+                {
+                    await context.BusinessOwnerships.AddAsync(new BusinessDomain.BusinessOwnership
+                    {
+                        Id = Guid.NewGuid(),
+                        OwnerId = user.Id,
+                        BusinessId = business.Id,
+                        LicenseId = license.Id,
+                        IsPrimaryOwner = true,
+                        GrantedAtUtc = DateTimeOffset.UtcNow
+                    });
+                }
+
+                var hasMembership = await context.UserBusinesses
+                    .AnyAsync(ub => ub.UserId == user.Id && ub.BusinessId == business.Id);
+
+                if (!hasMembership)
+                {
+                    await context.UserBusinesses.AddAsync(new UserBusiness
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = user.Id,
+                        BusinessId = business.Id,
+                        IsDefault = !defaultAssigned,
+                        IsActive = true,
+                        JoinedAtUtc = DateTimeOffset.UtcNow
+                    });
+
+                    if (!defaultAssigned)
+                        defaultAssigned = true;
+                }
+            }
+
+            await context.SaveChangesAsync();
+        }
+    }
+
+    private static string HashLicenseKey(string rawLicenseKey)
+    {
+        if (string.IsNullOrWhiteSpace(rawLicenseKey))
+            throw new InvalidOperationException("License key must not be empty in seed mapping.");
+
+        var normalized = rawLicenseKey.Trim();
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(normalized));
+        return $"seed_sha256:{Convert.ToHexString(bytes).ToLowerInvariant()}";
+    }
+
+    private sealed record LicenseMappingSeedDocument(IReadOnlyList<LicenseMappingSeedUser> Users)
+    {
+        public IReadOnlyList<LicenseMappingSeedUser> Users { get; init; } = Users;
+    }
+
+    private sealed record LicenseMappingSeedUser(
+        string Email,
+        string? FullName,
+        IReadOnlyList<string> Roles,
+        IReadOnlyList<string> BusinessNames,
+        LicenseMappingSeedLicense License)
+    {
+        public string Email { get; init; } = Email;
+        public string? FullName { get; init; } = FullName;
+        public IReadOnlyList<string> Roles { get; init; } = Roles ?? [];
+        public IReadOnlyList<string> BusinessNames { get; init; } = BusinessNames ?? [];
+        public LicenseMappingSeedLicense License { get; init; } = License;
+    }
+
+    private sealed record LicenseMappingSeedLicense(
+        string LicenseKey,
+        BusinessDomain.LicensePlan Plan,
+        BusinessDomain.LicenseStatus Status,
+        int MaxBusinesses,
+        int MaxBranchesPerBusiness,
+        int MaxEmployees,
+        bool AllowAdvancedReporting,
+        bool AllowMultiCurrency,
+        bool AllowIntegrations,
+        DateOnly StartsOn,
+        DateOnly? ExpiresOn)
+    {
+        public string LicenseKey { get; init; } = LicenseKey;
+        public BusinessDomain.LicensePlan Plan { get; init; } = Plan;
+        public BusinessDomain.LicenseStatus Status { get; init; } = Status;
+        public int MaxBusinesses { get; init; } = MaxBusinesses;
+        public int MaxBranchesPerBusiness { get; init; } = MaxBranchesPerBusiness;
+        public int MaxEmployees { get; init; } = MaxEmployees;
+        public bool AllowAdvancedReporting { get; init; } = AllowAdvancedReporting;
+        public bool AllowMultiCurrency { get; init; } = AllowMultiCurrency;
+        public bool AllowIntegrations { get; init; } = AllowIntegrations;
+        public DateOnly StartsOn { get; init; } = StartsOn;
+        public DateOnly? ExpiresOn { get; init; } = ExpiresOn;
     }
 }

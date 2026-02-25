@@ -1,0 +1,61 @@
+{
+  "users": [
+    {
+      "email": "owner.enterprise@your-domain.local",
+      "fullName": "Enterprise Owner",
+      "roles": ["Owner"],
+      "businessNames": ["ABC Group", "XYZ Tech"],
+      "license": {
+        "licenseKey": "LIC-ENT-CHANGE-ME-001",
+        "plan": "Enterprise",
+        "status": "Active",
+        "maxBusinesses": 20,
+        "maxBranchesPerBusiness": 50,
+        "maxEmployees": 2000,
+        "allowAdvancedReporting": true,
+        "allowMultiCurrency": true,
+        "allowIntegrations": true,
+        "startsOn": "2026-01-01",
+        "expiresOn": null
+      }
+    },
+    {
+      "email": "owner.pro@your-domain.local",
+      "fullName": "Professional Owner",
+      "roles": ["Owner"],
+      "businessNames": ["ABC Group"],
+      "license": {
+        "licenseKey": "LIC-PRO-CHANGE-ME-002",
+        "plan": "Professional",
+        "status": "Active",
+        "maxBusinesses": 5,
+        "maxBranchesPerBusiness": 15,
+        "maxEmployees": 300,
+        "allowAdvancedReporting": true,
+        "allowMultiCurrency": true,
+        "allowIntegrations": true,
+        "startsOn": "2026-01-01",
+        "expiresOn": "2027-01-01"
+      }
+    },
+    {
+      "email": "owner.starter@your-domain.local",
+      "fullName": "Starter Owner",
+      "roles": ["Owner"],
+      "businessNames": ["XYZ Tech"],
+      "license": {
+        "licenseKey": "LIC-STARTER-CHANGE-ME-003",
+        "plan": "Starter",
+        "status": "Active",
+        "maxBusinesses": 2,
+        "maxBranchesPerBusiness": 5,
+        "maxEmployees": 50,
+        "allowAdvancedReporting": false,
+        "allowMultiCurrency": false,
+        "allowIntegrations": false,
+        "startsOn": "2026-01-01",
+        "expiresOn": "2026-12-31"
+      }
+    }
+  ]
+}

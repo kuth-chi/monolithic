@@ -1,0 +1,42 @@
+{
+  "users": [
+    {
+      "email": "admin@example.com",
+      "fullName": "Admin User",
+      "roles": ["Owner"],
+      "businessNames": ["ABC Group", "XYZ Tech"],
+      "license": {
+        "licenseKey": "LIC-ENT-ADMIN-CHANGE-ME-001",
+        "plan": "Enterprise",
+        "status": "Active",
+        "maxBusinesses": 10,
+        "maxBranchesPerBusiness": 20,
+        "maxEmployees": 500,
+        "allowAdvancedReporting": true,
+        "allowMultiCurrency": true,
+        "allowIntegrations": true,
+        "startsOn": "2026-01-01",
+        "expiresOn": null
+      }
+    },
+    {
+      "email": "sysadmin@example.com",
+      "fullName": "System Administrator",
+      "roles": ["SystemAdmin"],
+      "businessNames": ["ABC Group"],
+      "license": {
+        "licenseKey": "LIC-PRO-SYSADMIN-CHANGE-ME-002",
+        "plan": "Professional",
+        "status": "Active",
+        "maxBusinesses": 5,
+        "maxBranchesPerBusiness": 12,
+        "maxEmployees": 250,
+        "allowAdvancedReporting": true,
+        "allowMultiCurrency": true,
+        "allowIntegrations": true,
+        "startsOn": "2026-01-01",
+        "expiresOn": "2027-01-01"
+      }
+    }
+  ]
+}

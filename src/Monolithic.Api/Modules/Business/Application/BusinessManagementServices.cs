@@ -61,10 +61,15 @@ public sealed class BusinessLicenseService(ApplicationDbContext db) : IBusinessL
 {
     public async Task<BusinessLicenseDto?> GetByOwnerAsync(Guid ownerId, CancellationToken ct = default)
     {
-        var license = await db.BusinessLicenses
+        // NOTE: SQLite provider cannot translate ORDER BY on DateTimeOffset.
+        // Keep filtering in SQL, then order in-memory for cross-provider behavior.
+        var licenses = await db.BusinessLicenses
             .Where(l => l.OwnerId == ownerId && l.Status == LicenseStatus.Active)
+            .ToListAsync(ct);
+
+        var license = licenses
             .OrderByDescending(l => l.CreatedAtUtc)
-            .FirstOrDefaultAsync(ct);
+            .FirstOrDefault();
         return license?.ToDto();
     }
 

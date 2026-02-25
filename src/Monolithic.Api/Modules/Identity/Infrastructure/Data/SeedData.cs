@@ -17,6 +17,7 @@ public static class SeedData
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
+        var httpClientFactory = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>();
         var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
         var environment = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
         var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("SeedData");
@@ -49,6 +50,7 @@ public static class SeedData
             context,
             userManager,
             roleManager,
+            httpClientFactory,
             configuration,
             environment,
             logger);
@@ -601,29 +603,19 @@ public static class SeedData
         ApplicationDbContext context,
         UserManager<ApplicationUser> userManager,
         RoleManager<ApplicationRole> roleManager,
+        IHttpClientFactory httpClientFactory,
         IConfiguration configuration,
         IWebHostEnvironment environment,
         ILogger logger)
     {
-        var configuredPath = configuration["Seed:LicenseMapping:FilePath"];
-        var relativeOrAbsolutePath = string.IsNullOrWhiteSpace(configuredPath)
-            ? Path.Combine("SeedData", "license-mapping.json")
-            : configuredPath;
-
-        var fullPath = Path.IsPathRooted(relativeOrAbsolutePath)
-            ? relativeOrAbsolutePath
-            : Path.Combine(environment.ContentRootPath, relativeOrAbsolutePath);
-
-        if (!File.Exists(fullPath))
-        {
-            logger.LogInformation("[Seed] License mapping file not found at '{Path}'. Skipping file-based mapping.", fullPath);
+        var source = await LoadLicenseMappingJsonAsync(httpClientFactory, configuration, environment, logger);
+        if (source is null)
             return;
-        }
 
-        var json = await File.ReadAllTextAsync(fullPath);
+        var json = source.Value.Json;
         if (string.IsNullOrWhiteSpace(json))
         {
-            logger.LogWarning("[Seed] License mapping file is empty at '{Path}'.", fullPath);
+            logger.LogWarning("[Seed] License mapping source is empty ({Source}).", source.Value.Source);
             return;
         }
 
@@ -638,7 +630,7 @@ public static class SeedData
         var doc = JsonSerializer.Deserialize<LicenseMappingSeedDocument>(json, jsonOptions);
         if (doc is null || doc.Users.Count == 0)
         {
-            logger.LogInformation("[Seed] No user-license mappings found in '{Path}'.", fullPath);
+            logger.LogInformation("[Seed] No user-license mappings found in {Source}.", source.Value.Source);
             return;
         }
 
@@ -823,6 +815,97 @@ public static class SeedData
 
             await context.SaveChangesAsync();
         }
+    }
+
+    private static async Task<(string Json, string Source)?> LoadLicenseMappingJsonAsync(
+        IHttpClientFactory httpClientFactory,
+        IConfiguration configuration,
+        IWebHostEnvironment environment,
+        ILogger logger)
+    {
+        var sourceUrl = configuration["Seed:LicenseMapping:SourceUrl"];
+        var allowLocalFallback = configuration.GetValue("Seed:LicenseMapping:AllowLocalFallback", true);
+        var maxBytes = configuration.GetValue("Seed:LicenseMapping:MaxPayloadBytes", 1_048_576); // 1 MB default
+
+        if (!string.IsNullOrWhiteSpace(sourceUrl))
+        {
+            if (!Uri.TryCreate(sourceUrl, UriKind.Absolute, out var uri))
+            {
+                logger.LogError("[Seed] Seed:LicenseMapping:SourceUrl is invalid: {Url}", sourceUrl);
+                if (!allowLocalFallback) return null;
+            }
+            else if (!string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            {
+                logger.LogError("[Seed] License mapping URL must use HTTPS. Rejected: {Url}", sourceUrl);
+                if (!allowLocalFallback) return null;
+            }
+            else
+            {
+                try
+                {
+                    using var http = httpClientFactory.CreateClient("seed-license-mapping");
+                    using var response = await http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        logger.LogError(
+                            "[Seed] Failed to fetch license mapping URL {Url}. Status: {StatusCode}",
+                            sourceUrl,
+                            (int)response.StatusCode);
+                        if (!allowLocalFallback) return null;
+                    }
+                    else
+                    {
+                        var contentLength = response.Content.Headers.ContentLength;
+                        if (contentLength.HasValue && contentLength.Value > maxBytes)
+                        {
+                            logger.LogError(
+                                "[Seed] License mapping payload too large ({Length} bytes > {Max} bytes) from {Url}.",
+                                contentLength.Value,
+                                maxBytes,
+                                sourceUrl);
+                            if (!allowLocalFallback) return null;
+                        }
+                        else
+                        {
+                            var remoteJson = await response.Content.ReadAsStringAsync();
+                            if (!string.IsNullOrWhiteSpace(remoteJson) && Encoding.UTF8.GetByteCount(remoteJson) <= maxBytes)
+                            {
+                                logger.LogInformation("[Seed] Loaded license mappings from remote URL: {Url}", sourceUrl);
+                                return (remoteJson, $"remote URL '{sourceUrl}'");
+                            }
+
+                            logger.LogWarning("[Seed] Remote license mapping payload from {Url} is empty or exceeds max bytes.", sourceUrl);
+                            if (!allowLocalFallback) return null;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "[Seed] Error fetching remote license mapping from {Url}.", sourceUrl);
+                    if (!allowLocalFallback) return null;
+                }
+            }
+        }
+
+        var configuredPath = configuration["Seed:LicenseMapping:FilePath"];
+        var relativeOrAbsolutePath = string.IsNullOrWhiteSpace(configuredPath)
+            ? Path.Combine("SeedData", "license-mapping.json")
+            : configuredPath;
+
+        var fullPath = Path.IsPathRooted(relativeOrAbsolutePath)
+            ? relativeOrAbsolutePath
+            : Path.Combine(environment.ContentRootPath, relativeOrAbsolutePath);
+
+        if (!File.Exists(fullPath))
+        {
+            logger.LogInformation("[Seed] License mapping file not found at '{Path}'. Skipping mapping seed.", fullPath);
+            return null;
+        }
+
+        var localJson = await File.ReadAllTextAsync(fullPath);
+        logger.LogInformation("[Seed] Loaded license mappings from local file: {Path}", fullPath);
+        return (localJson, $"local file '{fullPath}'");
     }
 
     private static string HashLicenseKey(string rawLicenseKey)

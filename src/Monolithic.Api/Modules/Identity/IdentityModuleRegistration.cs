@@ -74,6 +74,13 @@ public static class IdentityModuleRegistration
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IAuthAuditLogger, AuthAuditLogger>();
 
+        services.AddHttpClient("seed-license-mapping", client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(10);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Monolithic-SeedData/1.0");
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+        });
+
         // JWT configuration
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
 

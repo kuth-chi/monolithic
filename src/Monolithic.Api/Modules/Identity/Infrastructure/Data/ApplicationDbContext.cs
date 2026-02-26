@@ -153,6 +153,13 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
     {
         base.OnModelCreating(modelBuilder);
 
+        var customerCodeIndexFilter = string.Equals(
+            Database.ProviderName,
+            "Npgsql.EntityFrameworkCore.PostgreSQL",
+            StringComparison.Ordinal)
+            ? "\"CustomerCode\" <> ''"
+            : "[CustomerCode] <> ''";
+
         // ── Global soft-delete query filters ────────────────────────────────────────────────
         // Any entity that implements ISoftDeletable automatically gets a filter
         // excluding records where IsDeleted = true from every query.
@@ -1055,7 +1062,7 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
 
             entity.HasIndex(e => new { e.BusinessId, e.CustomerCode })
                 .IsUnique()
-                .HasFilter("[CustomerCode] <> ''");
+                .HasFilter(customerCodeIndexFilter);
 
             entity.HasIndex(e => new { e.BusinessId, e.IsDeleted, e.DeletedAtUtc })
                 .HasDatabaseName("IX_Customers_SoftDelete");

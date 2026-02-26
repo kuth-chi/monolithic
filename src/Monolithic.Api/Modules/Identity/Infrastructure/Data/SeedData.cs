@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -139,13 +140,23 @@ public static class SeedData
 
     private static async Task<Dictionary<string, Permission>> SeedPermissionsAsync(ApplicationDbContext context)
     {
-        if (context.Permissions.Any())
-            return context.Permissions.ToDictionary(p => p.Name);
-
+        // Keep permission catalog in sync on every startup.
+        // This is intentionally additive (upsert-by-name): existing rows are preserved,
+        // missing keys are inserted so newly introduced permissions appear in older DBs.
         var permissions = new List<Permission>
         {
             // Owner permissions (full access)
             new() { Id = Guid.NewGuid(), Name = "*:full", Description = "Full system access" },
+
+            // Owner / admin
+            new() { Id = Guid.NewGuid(), Name = "owner:read", Description = "Read owner dashboard and owned businesses" },
+            new() { Id = Guid.NewGuid(), Name = "owner:write", Description = "Create/revoke owned businesses" },
+            new() { Id = Guid.NewGuid(), Name = "admin:write", Description = "Administrative write access" },
+
+            // Business management
+            new() { Id = Guid.NewGuid(), Name = "business:read", Description = "Read business settings, branches, and policies" },
+            new() { Id = Guid.NewGuid(), Name = "business:write", Description = "Write business settings, branches, and policies" },
+            new() { Id = Guid.NewGuid(), Name = "business:admin", Description = "Administrative business operations" },
 
             // User management
             new() { Id = Guid.NewGuid(), Name = "users:read", Description = "Read user data" },
@@ -164,12 +175,22 @@ public static class SeedData
             new() { Id = Guid.NewGuid(), Name = "sales:create", Description = "Create sales orders" },
             new() { Id = Guid.NewGuid(), Name = "sales:update", Description = "Update sales orders" },
             new() { Id = Guid.NewGuid(), Name = "sales:delete", Description = "Delete sales orders" },
+            new() { Id = Guid.NewGuid(), Name = "sales:write", Description = "Create/update/delete sales documents" },
 
             // Accounting
             new() { Id = Guid.NewGuid(), Name = "accounting:read", Description = "Read financial/accounting data" },
             new() { Id = Guid.NewGuid(), Name = "accounting:create", Description = "Create accounting entries" },
             new() { Id = Guid.NewGuid(), Name = "accounting:update", Description = "Update accounting entries" },
             new() { Id = Guid.NewGuid(), Name = "accounting:delete", Description = "Delete accounting entries" },
+
+            // Finance (module-level aliases used by V1 controllers)
+            new() { Id = Guid.NewGuid(), Name = "finance:read", Description = "Read finance and accounting data" },
+            new() { Id = Guid.NewGuid(), Name = "finance:write", Description = "Create/update finance data" },
+            new() { Id = Guid.NewGuid(), Name = "finance:admin", Description = "Administrative finance operations" },
+
+            // Costing
+            new() { Id = Guid.NewGuid(), Name = "costing:read", Description = "Read costing setups and ledgers" },
+            new() { Id = Guid.NewGuid(), Name = "costing:write", Description = "Create/update costing setups" },
 
             // Inventory
             new() { Id = Guid.NewGuid(), Name = "inventory:read", Description = "Read inventory data" },
@@ -198,6 +219,12 @@ public static class SeedData
             new() { Id = Guid.NewGuid(), Name = "purchase:create", Description = "Create purchase orders" },
             new() { Id = Guid.NewGuid(), Name = "purchase:update", Description = "Update purchase orders" },
             new() { Id = Guid.NewGuid(), Name = "purchase:delete", Description = "Delete purchase orders" },
+            new() { Id = Guid.NewGuid(), Name = "purchase:write", Description = "Create/update purchase operations" },
+
+            // Purchasing workflow (estimate PO)
+            new() { Id = Guid.NewGuid(), Name = "purchasing:read", Description = "Read estimate purchase orders" },
+            new() { Id = Guid.NewGuid(), Name = "purchasing:write", Description = "Create/update estimate purchase orders" },
+            new() { Id = Guid.NewGuid(), Name = "purchasing:approve", Description = "Approve/convert estimate purchase orders" },
 
             // Analytics & Dashboards
             new() { Id = Guid.NewGuid(), Name = "analytics:read", Description = "Read analytics and dashboards" },
@@ -218,16 +245,119 @@ public static class SeedData
             new() { Id = Guid.NewGuid(), Name = "platform:themes:write",       Description = "Create and edit theme profiles" },
             new() { Id = Guid.NewGuid(), Name = "platform:preferences:read",   Description = "View user preferences and dashboard layouts" },
             new() { Id = Guid.NewGuid(), Name = "platform:preferences:write",  Description = "Update user preferences and dashboard layouts" },
+            new() { Id = Guid.NewGuid(), Name = "platform:preferences:admin",  Description = "Administer user preferences" },
             new() { Id = Guid.NewGuid(), Name = "platform:feature-flags:read", Description = "View feature flags" },
             new() { Id = Guid.NewGuid(), Name = "platform:feature-flags:write", Description = "Update and create feature flags" },
             new() { Id = Guid.NewGuid(), Name = "platform:notifications:read",  Description = "View notification logs" },
-            new() { Id = Guid.NewGuid(), Name = "platform:notifications:write", Description = "Send notifications" }
+            new() { Id = Guid.NewGuid(), Name = "platform:notifications:write", Description = "Send notifications" },
+
+            // Role catalog
+            new() { Id = Guid.NewGuid(), Name = "users:roles:read", Description = "View role catalog" },
+            new() { Id = Guid.NewGuid(), Name = "users:roles:admin", Description = "Manage roles and permissions" }
         };
 
-        await context.Permissions.AddRangeAsync(permissions);
-        await context.SaveChangesAsync();
+        foreach (var permission in permissions)
+        {
+            ApplyDerivedPermissionMetadata(permission);
+        }
 
-        return permissions.ToDictionary(p => p.Name);
+        var existing = await context.Permissions
+            .AsNoTracking()
+            .Select(p => p.Name)
+            .ToListAsync();
+
+        var existingSet = existing.ToHashSet(StringComparer.Ordinal);
+        var missing = permissions
+            .Where(p => !existingSet.Contains(p.Name))
+            .ToList();
+
+        if (missing.Count > 0)
+        {
+            await context.Permissions.AddRangeAsync(missing);
+            await context.SaveChangesAsync();
+        }
+
+        // Backfill metadata for existing rows created before grouped permission model.
+        var existingRows = await context.Permissions.ToListAsync();
+        var hasMetadataUpdates = false;
+
+        foreach (var permission in existingRows)
+        {
+            var originalSource = permission.Source;
+            var originalGroup = permission.GroupName;
+            var originalFeature = permission.FeatureName;
+            var originalAction = permission.ActionName;
+
+            ApplyDerivedPermissionMetadata(permission);
+
+            if (!string.Equals(originalSource, permission.Source, StringComparison.Ordinal) ||
+                !string.Equals(originalGroup, permission.GroupName, StringComparison.Ordinal) ||
+                !string.Equals(originalFeature, permission.FeatureName, StringComparison.Ordinal) ||
+                !string.Equals(originalAction, permission.ActionName, StringComparison.Ordinal))
+            {
+                hasMetadataUpdates = true;
+            }
+        }
+
+        if (hasMetadataUpdates)
+            await context.SaveChangesAsync();
+
+        return await context.Permissions.ToDictionaryAsync(p => p.Name);
+    }
+
+    private static void ApplyDerivedPermissionMetadata(Permission permission)
+    {
+        var segments = permission.Name
+            .Split(':', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        var source = string.IsNullOrWhiteSpace(permission.Source)
+            ? segments.FirstOrDefault() ?? "system"
+            : permission.Source;
+
+        var featureSegment = segments.Length switch
+        {
+            >= 3 => segments[1],
+            2 => segments[0],
+            _ => "global"
+        };
+
+        var actionSegment = segments.Length switch
+        {
+            >= 2 => segments[^1],
+            _ => "read"
+        };
+
+        permission.Source = NormalizeSegment(source);
+        permission.GroupName = string.IsNullOrWhiteSpace(permission.GroupName)
+            ? ToTitleCase(source)
+            : permission.GroupName.Trim();
+        permission.FeatureName = string.IsNullOrWhiteSpace(permission.FeatureName)
+            ? ToTitleCase(featureSegment)
+            : permission.FeatureName.Trim();
+        permission.ActionName = string.IsNullOrWhiteSpace(permission.ActionName)
+            ? NormalizeSegment(actionSegment)
+            : NormalizeSegment(permission.ActionName);
+    }
+
+    private static string NormalizeSegment(string value)
+        => value
+            .Trim()
+            .ToLowerInvariant()
+            .Replace(' ', '-')
+            .Replace('_', '-');
+
+    private static string ToTitleCase(string value)
+    {
+        var cleaned = value
+            .Trim()
+            .Replace('-', ' ')
+            .Replace('_', ' ')
+            .ToLowerInvariant();
+
+        if (string.IsNullOrWhiteSpace(cleaned))
+            return "General";
+
+        return CultureInfo.InvariantCulture.TextInfo.ToTitleCase(cleaned);
     }
 
     private static async Task<(ApplicationRole ownerRole, ApplicationRole systemAdminRole, ApplicationRole staffRole, ApplicationRole userRole)> SeedRolesAsync(
@@ -295,13 +425,16 @@ public static class SeedData
         await AssignPermissionsToRoleAsync(context, staffRole, permissions,
         [
             "users:read", "employees:read", "employees:create", "employees:update",
-            "sales:read", "sales:create", "sales:update",
-            "accounting:read",
+            "sales:read", "sales:create", "sales:update", "sales:write",
+            "accounting:read", "finance:read", "finance:write",
             "inventory:read", "inventory:create", "inventory:update",
             "customers:read", "customers:create", "customers:update", "customers:delete",
             "vendors:read", "vendors:create", "vendors:update", "vendors:delete",
             "bankaccounts:read", "bankaccounts:create", "bankaccounts:update", "bankaccounts:delete",
-            "purchase:read", "purchase:create", "purchase:update",
+            "purchase:read", "purchase:create", "purchase:update", "purchase:write",
+            "purchasing:read", "purchasing:write",
+            "business:read", "business:write",
+            "costing:read", "costing:write",
             "warehouse:read", "warehouse:create", "warehouse:update",
             "analytics:read", "reports:read"
         ]);

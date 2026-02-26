@@ -314,8 +314,13 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).HasMaxLength(256).IsRequired();
+            entity.Property(e => e.Source).HasMaxLength(100).IsRequired().HasDefaultValue(string.Empty);
+            entity.Property(e => e.GroupName).HasMaxLength(100).IsRequired().HasDefaultValue(string.Empty);
+            entity.Property(e => e.FeatureName).HasMaxLength(150).IsRequired().HasDefaultValue(string.Empty);
+            entity.Property(e => e.ActionName).HasMaxLength(50).IsRequired().HasDefaultValue(string.Empty);
             entity.Property(e => e.Description).HasMaxLength(512);
             entity.HasIndex(e => e.Name).IsUnique();
+            entity.HasIndex(e => new { e.GroupName, e.FeatureName, e.ActionName });
         });
 
         // Configure RolePermission (composite key + relationships)

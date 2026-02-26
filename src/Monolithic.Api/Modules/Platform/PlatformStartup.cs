@@ -31,8 +31,25 @@ public static class PlatformStartup
 
         // ── Step 2: Module first-run hooks (seed reference data) ──────────────
         await RunModuleFirstRunHooksAsync(scope);
-        await SeedDefaultTemplatesAsync(scope);
-        await SeedSystemThemeAsync(scope);
+        try
+        {
+            await SeedDefaultTemplatesAsync(scope);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex,
+                "[Platform] Default template seeding failed. Startup will continue, but templates may be incomplete.");
+        }
+
+        try
+        {
+            await SeedSystemThemeAsync(scope);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex,
+                "[Platform] System theme seeding failed. Startup will continue, but default theme may be missing.");
+        }
 
         logger.LogInformation("[Platform] Startup initialization complete.");
     }

@@ -8,6 +8,9 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Infrastructure__PostgreSql__ConnectionString: Host=postgres;Port=5432;Database=monolithic;Username=postgres;Password=${POSTGRES_PASSWORD}
+      Infrastructure__Databases__Platform__ConnectionString: Host=postgres;Port=5432;Database=monolithic;Username=postgres;Password=${POSTGRES_PASSWORD}
+      Infrastructure__Databases__Identity__ConnectionString: Host=postgres;Port=5432;Database=monolithic;Username=postgres;Password=${POSTGRES_PASSWORD}
+      Infrastructure__Databases__Business__ConnectionString: Host=postgres;Port=5432;Database=monolithic;Username=postgres;Password=${POSTGRES_PASSWORD}
       Infrastructure__Redis__ConnectionString: redis:6379
       Infrastructure__RabbitMq__Host: rabbitmq
       Infrastructure__RabbitMq__Port: 5672

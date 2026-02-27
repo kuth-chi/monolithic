@@ -18,9 +18,10 @@ public sealed class PurchasesModule : ModuleBase
     public override string              ModuleId     => "purchases";
     public override string              DisplayName  => "Purchases";
     public override string              Version      => "1.0.0";
-    public override string              Description  => "Vendors, purchase orders, purchase returns, and the full procure-to-pay workflow.";
+    public override string              Description  => "Purchase orders, purchase returns, and the full procure-to-pay workflow. Vendor management is provided by the Vendors module.";
     public override string              Icon         => "shopping-cart";
-    public override IEnumerable<string> Dependencies => ["business", "inventory"];
+    // vendors is a required dependency — Purchases references vendor IDs on POs.
+    public override IEnumerable<string> Dependencies => ["business", "inventory", "vendors"];
 
     public override void RegisterServices(
         IServiceCollection services,
@@ -30,18 +31,17 @@ public sealed class PurchasesModule : ModuleBase
 
     public override IEnumerable<NavigationItem> GetNavigationItems()
     {
-        yield return Nav("root",          "Purchases",         "/purchases",               UiContext.Operation, icon: "shopping-cart",   order: 60, isGroup: true);
-        yield return Nav("vendors",       "Vendors",           "/purchases/vendors",       UiContext.Operation, icon: "truck",           order: 61, parentKey: "purchases.root", requiredPermissions: ["purchases:vendors:read"]);
-        yield return Nav("rfq",           "RFQ / Estimates",   "/purchases/rfq",           UiContext.Operation, icon: "document-text",   order: 62, parentKey: "purchases.root", requiredPermissions: ["purchases:orders:read"]);
-        yield return Nav("orders",        "Purchase Orders",   "/purchases/orders",        UiContext.Operation, icon: "clipboard-list",  order: 63, parentKey: "purchases.root", requiredPermissions: ["purchases:orders:read"]);
-        yield return Nav("returns",       "Purchase Returns",  "/purchases/returns",       UiContext.Operation, icon: "arrow-uturn-left",order: 64, parentKey: "purchases.root", requiredPermissions: ["purchases:orders:read"]);
+        yield return Nav("root",    "Purchases",        "/purchases",           UiContext.Operation, icon: "shopping-cart",    order: 60, isGroup: true);
+        yield return Nav("rfq",     "RFQ / Estimates",  "/purchases/rfq",       UiContext.Operation, icon: "document-text",    order: 61, parentKey: "purchases.root", requiredPermissions: ["purchases:orders:read"]);
+        yield return Nav("orders",  "Purchase Orders",  "/purchases/orders",    UiContext.Operation, icon: "clipboard-list",   order: 62, parentKey: "purchases.root", requiredPermissions: ["purchases:orders:read"]);
+        yield return Nav("returns", "Purchase Returns", "/purchases/returns",   UiContext.Operation, icon: "arrow-uturn-left", order: 63, parentKey: "purchases.root", requiredPermissions: ["purchases:orders:read"]);
+        // Vendor quick-link — navigates to the standalone Vendors module
+        yield return Nav("vendors-link", "Vendors",     "/vendors",             UiContext.Operation, icon: "truck",            order: 64, parentKey: "purchases.root", requiredPermissions: ["vendors:read"]);
     }
 
     public override IEnumerable<PermissionDescriptor> GetPermissions()
     {
-        yield return Perm("vendors",  "read",   "View Vendors",              defaultRoles: ["admin", "manager", "staff"]);
-        yield return Perm("vendors",  "write",  "Manage Vendors",            defaultRoles: ["admin", "manager"]);
-        yield return Perm("vendors",  "delete", "Delete Vendors",            defaultRoles: ["admin"],              isSensitive: true);
+        // Vendor permissions are now declared by the Vendors module.
         yield return Perm("orders",   "read",   "View Purchase Orders",      defaultRoles: ["admin", "manager", "staff"]);
         yield return Perm("orders",   "write",  "Create / Edit POs",         defaultRoles: ["admin", "manager"]);
         yield return Perm("orders",   "approve","Approve Purchase Orders",   defaultRoles: ["admin"],              isSensitive: true);

@@ -22,7 +22,7 @@
     {
       "email": "sysadmin@example.com",
       "fullName": "System Administrator",
-      "roles": ["SystemAdmin"],
+      "roles": ["System Admin"],
       "businessNames": ["ABC Group"],
       "license": {
         "licenseKey": "LIC-PRO-SYSADMIN-CHANGE-ME-002",

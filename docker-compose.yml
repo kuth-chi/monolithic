@@ -29,6 +29,8 @@ services:
       Seed__Bootstrap__ResetToken: ${SEED_BOOTSTRAP_RESET_TOKEN}
       # CORS — set at least one origin so the CORS policy does not fall back to AllowAnyOrigin
       # Cors__AllowedOrigins__0: ${FRONTEND_URL}
+    volumes:
+      - dp_keys:/root/.aspnet/DataProtection-Keys
     depends_on:
       postgres:
         condition: service_healthy
@@ -82,3 +84,4 @@ services:
 
 volumes:
   postgres_data:
+  dp_keys:

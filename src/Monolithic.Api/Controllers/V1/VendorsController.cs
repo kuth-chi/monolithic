@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Monolithic.Api.Modules.Identity.Authorization;
-using Monolithic.Api.Modules.Purchases.Vendors.Application;
-using Monolithic.Api.Modules.Purchases.Vendors.Contracts;
+using Monolithic.Api.Modules.Vendors.Application;
+using Monolithic.Api.Modules.Vendors.Contracts;
 
 namespace Monolithic.Api.Controllers.V1;
 
@@ -29,7 +29,7 @@ public sealed class VendorsController(IVendorService vendorService) : Controller
     }
 
     [HttpPost]
-    [RequirePermission("vendors:create")]
+    [RequirePermission("vendors:write")]
     [ProducesResponseType<VendorDto>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] CreateVendorRequest request, CancellationToken cancellationToken)
@@ -39,7 +39,7 @@ public sealed class VendorsController(IVendorService vendorService) : Controller
     }
 
     [HttpPut("{id:guid}")]
-    [RequirePermission("vendors:update")]
+    [RequirePermission("vendors:write")]
     [ProducesResponseType<VendorDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateVendorRequest request, CancellationToken cancellationToken)

@@ -1,16 +1,13 @@
-using Monolithic.Api.Modules.Purchases.Vendors.Contracts;
+// ── Backward-compatibility forwarding ─────────────────────────────────────────
+// Vendor management has been extracted to its own top-level Vendors module.
+// This alias keeps any internal Purchases code that references the old namespace
+// compiling without changes.
 
 namespace Monolithic.Api.Modules.Purchases.Vendors.Application;
 
-public interface IVendorService
-{
-    Task<IReadOnlyCollection<VendorDto>> GetAllAsync(Guid? businessId = null, CancellationToken cancellationToken = default);
-
-    Task<VendorDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
-
-    Task<VendorDto> CreateAsync(CreateVendorRequest request, CancellationToken cancellationToken = default);
-
-    Task<VendorDto?> UpdateAsync(Guid id, UpdateVendorRequest request, CancellationToken cancellationToken = default);
-
-    Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default);
-}
+/// <summary>
+/// Forwarding interface — extends the canonical Vendors module interface.
+/// New code should reference Monolithic.Api.Modules.Vendors.Application.IVendorService directly.
+/// </summary>
+[Obsolete("Use Monolithic.Api.Modules.Vendors.Application.IVendorService directly.")]
+public interface IVendorService : Monolithic.Api.Modules.Vendors.Application.IVendorService { }

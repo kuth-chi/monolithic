@@ -64,15 +64,29 @@ public static class SeedData
         }
 
         // ── Step 6: File / remote license mapping ─────────────────────────────
-        logger.LogInformation("[Seed] Step 6/6 — License mapping (file / remote)");
-        await ApplyLicenseMappingsFromFileAsync(
-            context,
-            userManager,
-            roleManager,
-            httpClientFactory,
-            configuration,
-            environment,
-            logger);
+        // Disabled by default — owners sign up and activate their own license through
+        // the activation flow (POST /api/v1/owner/businesses/{id}/activate).
+        // Enable only when pre-seeding known tenants via the mapping file is required
+        // (e.g. internal migration or demo environments).
+        var licenseMappingEnabled = configuration.GetValue("Seed:LicenseMapping:Enabled", false);
+        if (licenseMappingEnabled)
+        {
+            logger.LogInformation("[Seed] Step 6/6 — License mapping (file / remote)");
+            await ApplyLicenseMappingsFromFileAsync(
+                context,
+                userManager,
+                roleManager,
+                httpClientFactory,
+                configuration,
+                environment,
+                logger);
+        }
+        else
+        {
+            logger.LogInformation(
+                "[Seed] Step 6/6 skipped — Seed:LicenseMapping:Enabled is false. " +
+                "Owners register and activate their license through the platform activation flow.");
+        }
 
         logger.LogInformation("[Seed] ══════════════════════════════════════════");
         logger.LogInformation("[Seed] Database seeding completed successfully.");
@@ -894,15 +908,30 @@ public static class SeedData
             return;
         }
 
-        // Validate duplicate emails in seed file (case-insensitive)
-        var duplicateEmails = doc.Licenses
-            .GroupBy(u => u.Email.Trim().ToLowerInvariant())
-            .Where(g => g.Count() > 1)
-            .Select(g => g.Key)
-            .ToList();
-
-        if (duplicateEmails.Count > 0)
-            throw new InvalidOperationException($"Duplicate email(s) in license mapping file: {string.Join(", ", duplicateEmails)}");
+        // Deduplicate entries by email (case-insensitive).
+        // A single email can legitimately appear in multiple entries when the same user
+        // holds more than one registered business set (different license tiers).
+        // At seed time we only create one user account and one active license per email;
+        // the activation flow resolves the correct entry at runtime using the businessId.
+        // Log a warning for any skipped duplicates so operators can audit the mapping file.
+        var seenEmails      = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var dedupedLicenses = new List<GitHubLicenseEntry>();
+        foreach (var lic in doc.Licenses)
+        {
+            var normalised = lic.Email.Trim();
+            if (seenEmails.Add(normalised))
+            {
+                dedupedLicenses.Add(lic);
+            }
+            else
+            {
+                logger.LogWarning(
+                    "[Seed] Duplicate email '{Email}' in license mapping — additional entry skipped at seed time. " +
+                    "LicenseKey={LicenseKey}. The activation flow will resolve all entries at runtime.",
+                    normalised, lic.License?.LicenseKey);
+            }
+        }
+        doc = doc with { Licenses = dedupedLicenses };
 
         // Validate duplicate license keys in seed file (hashed before storing)
         var duplicateKeys = doc.Licenses

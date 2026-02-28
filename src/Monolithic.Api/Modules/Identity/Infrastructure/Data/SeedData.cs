@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using BusinessDomain = Monolithic.Api.Modules.Business.Domain;
+using Monolithic.Api.Modules.Business.Contracts;
 using Monolithic.Api.Modules.Identity.Domain;
 
 namespace Monolithic.Api.Modules.Identity.Infrastructure.Data;
@@ -23,30 +24,39 @@ public static class SeedData
         var environment = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
         var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("SeedData");
 
+        logger.LogInformation("[Seed] ══════════════════════════════════════════");
+        logger.LogInformation("[Seed] Database seeding started.");
+        logger.LogInformation("[Seed] ══════════════════════════════════════════");
+
         await context.Database.EnsureCreatedAsync();
+        logger.LogInformation("[Seed] Schema verified / created.");
 
         // Optional destructive bootstrap reset for local/dev re-install scenarios.
         // Guarded by explicit config + confirmation token to avoid accidental data loss.
         await TryResetBootstrapDataAsync(context, configuration, logger);
 
-        // Seed Permissions
-        var permissions = await SeedPermissionsAsync(context);
+        // ── Step 1: Permissions ───────────────────────────────────────────────
+        logger.LogInformation("[Seed] Step 1/6 — Permissions");
+        var permissions = await SeedPermissionsAsync(context, logger);
 
-        // Seed Roles
-        var (ownerRole, systemAdminRole, staffRole, userRole) = await SeedRolesAsync(roleManager, context, permissions);
+        // ── Step 2: Roles ─────────────────────────────────────────────────────
+        logger.LogInformation("[Seed] Step 2/6 — Roles");
+        var (ownerRole, systemAdminRole, staffRole, userRole) = await SeedRolesAsync(roleManager, context, permissions, logger);
 
-        // Seed Users
-        await SeedUsersAsync(userManager, ownerRole, systemAdminRole, staffRole, userRole);
+        // ── Step 3: Demo users ────────────────────────────────────────────────
+        logger.LogInformation("[Seed] Step 3/6 — Demo users");
+        await SeedUsersAsync(userManager, ownerRole, systemAdminRole, staffRole, userRole, logger);
 
-        // Seed demo businesses + user-business memberships (auto-default selection on login)
-        await SeedBusinessesAndMembershipsAsync(context, userManager);
+        // ── Step 4: Demo businesses + memberships ─────────────────────────────
+        logger.LogInformation("[Seed] Step 4/6 — Demo businesses & memberships");
+        await SeedBusinessesAndMembershipsAsync(context, userManager, logger);
 
-        // Seed BusinessLicense + BusinessOwnership for the owner (required by /api/v1/owner/* endpoints).
-        // Called unconditionally so it runs even when UserBusiness records already exist.
-        await SeedOwnershipAndLicenseAsync(context, userManager);
+        // ── Step 5: Owner license + ownership records ─────────────────────────
+        logger.LogInformation("[Seed] Step 5/6 — Owner license & ownership");
+        await SeedOwnershipAndLicenseAsync(context, userManager, logger);
 
-        // Optional file-driven bootstrap mapping: user -> license (+ optional ownership mappings).
-        // Designed for Docker/local first-run scenarios and idempotent re-runs.
+        // ── Step 6: File / remote license mapping ─────────────────────────────
+        logger.LogInformation("[Seed] Step 6/6 — License mapping (file / remote)");
         await ApplyLicenseMappingsFromFileAsync(
             context,
             userManager,
@@ -55,6 +65,10 @@ public static class SeedData
             configuration,
             environment,
             logger);
+
+        logger.LogInformation("[Seed] ══════════════════════════════════════════");
+        logger.LogInformation("[Seed] Database seeding completed successfully.");
+        logger.LogInformation("[Seed] ══════════════════════════════════════════");
     }
 
     private static async Task TryResetBootstrapDataAsync(
@@ -138,7 +152,9 @@ public static class SeedData
         logger.LogWarning("[Seed] Destructive bootstrap reset completed.");
     }
 
-    private static async Task<Dictionary<string, Permission>> SeedPermissionsAsync(ApplicationDbContext context)
+    private static async Task<Dictionary<string, Permission>> SeedPermissionsAsync(
+        ApplicationDbContext context,
+        ILogger logger)
     {
         // Keep permission catalog in sync on every startup.
         // This is intentionally additive (upsert-by-name): existing rows are preserved,
@@ -253,7 +269,17 @@ public static class SeedData
 
             // Role catalog
             new() { Id = Guid.NewGuid(), Name = "users:roles:read", Description = "View role catalog" },
-            new() { Id = Guid.NewGuid(), Name = "users:roles:admin", Description = "Manage roles and permissions" }
+            new() { Id = Guid.NewGuid(), Name = "users:roles:admin", Description = "Manage roles and permissions" },
+
+            // User profiles — admin-elevated
+            new() { Id = Guid.NewGuid(), Name = "users:profiles:read",   Description = "Read any user profile (admin/manager)" },
+            new() { Id = Guid.NewGuid(), Name = "users:profiles:write",  Description = "Edit any user profile (admin override)" },
+            new() { Id = Guid.NewGuid(), Name = "users:profiles:delete", Description = "Deactivate user accounts (admin)" },
+
+            // User profiles — self-data (ABAC ownership-scoped)
+            // Holders may access ONLY their own profile; enforced at runtime
+            // by SelfOwnershipAuthorizationHandler.
+            new() { Id = Guid.NewGuid(), Name = "users:profiles:self", Description = "View and edit own user profile", IsSelfScoped = true }
         };
 
         foreach (var permission in permissions)
@@ -273,8 +299,15 @@ public static class SeedData
 
         if (missing.Count > 0)
         {
+            logger.LogInformation("[Seed]   Permissions — inserting {Count} new permission(s): {Names}",
+                missing.Count, string.Join(", ", missing.Select(p => p.Name)));
             await context.Permissions.AddRangeAsync(missing);
             await context.SaveChangesAsync();
+        }
+        else
+        {
+            logger.LogInformation("[Seed]   Permissions — all {Total} permission(s) already present, skipped.",
+                permissions.Count);
         }
 
         // Backfill metadata for existing rows created before grouped permission model.
@@ -297,11 +330,24 @@ public static class SeedData
             {
                 hasMetadataUpdates = true;
             }
+
+            // Backfill IsSelfScoped for :self permissions created before this field existed
+            if (!permission.IsSelfScoped
+                && permission.Name.EndsWith(":self", StringComparison.OrdinalIgnoreCase))
+            {
+                permission.IsSelfScoped = true;
+                hasMetadataUpdates = true;
+            }
         }
 
         if (hasMetadataUpdates)
+        {
+            logger.LogInformation("[Seed]   Permissions — backfilled metadata on existing rows.");
             await context.SaveChangesAsync();
+        }
 
+        var total = await context.Permissions.CountAsync();
+        logger.LogInformation("[Seed]   Permissions — catalog total: {Total} permission(s).", total);
         return await context.Permissions.ToDictionaryAsync(p => p.Name);
     }
 
@@ -337,6 +383,10 @@ public static class SeedData
         permission.ActionName = string.IsNullOrWhiteSpace(permission.ActionName)
             ? NormalizeSegment(actionSegment)
             : NormalizeSegment(permission.ActionName);
+
+        // Auto-derive IsSelfScoped from action token
+        if (string.Equals(actionSegment, "self", StringComparison.OrdinalIgnoreCase))
+            permission.IsSelfScoped = true;
     }
 
     private static string NormalizeSegment(string value)
@@ -363,7 +413,8 @@ public static class SeedData
     private static async Task<(ApplicationRole ownerRole, ApplicationRole systemAdminRole, ApplicationRole staffRole, ApplicationRole userRole)> SeedRolesAsync(
         RoleManager<ApplicationRole> roleManager,
         ApplicationDbContext context,
-        Dictionary<string, Permission> permissions)
+        Dictionary<string, Permission> permissions,
+        ILogger logger)
     {
         // ── Protected / system roles ──────────────────────────────────────────────────
         ApplicationRole? ownerRole = await roleManager.FindByNameAsync(SystemRoleNames.Owner);
@@ -377,12 +428,20 @@ public static class SeedData
                 IsSystemRole = true,
             };
             await roleManager.CreateAsync(ownerRole);
+            logger.LogInformation("[Seed]   Role created  : {Role} (system-protected)", SystemRoleNames.Owner);
         }
-        else if (!ownerRole.IsSystemRole)
+        else
         {
-            // Idempotent: mark pre-existing row as system-protected
-            ownerRole.IsSystemRole = true;
-            await roleManager.UpdateAsync(ownerRole);
+            if (!ownerRole.IsSystemRole)
+            {
+                ownerRole.IsSystemRole = true;
+                await roleManager.UpdateAsync(ownerRole);
+                logger.LogInformation("[Seed]   Role patched  : {Role} — marked system-protected.", SystemRoleNames.Owner);
+            }
+            else
+            {
+                logger.LogInformation("[Seed]   Role skipped  : {Role} (already exists)", SystemRoleNames.Owner);
+            }
         }
 
         ApplicationRole? systemAdminRole = await roleManager.FindByNameAsync(SystemRoleNames.SystemAdmin);
@@ -396,27 +455,64 @@ public static class SeedData
                 IsSystemRole = true,
             };
             await roleManager.CreateAsync(systemAdminRole);
+            logger.LogInformation("[Seed]   Role created  : {Role} (system-protected)", SystemRoleNames.SystemAdmin);
         }
-        else if (!systemAdminRole.IsSystemRole)
+        else
         {
-            systemAdminRole.IsSystemRole = true;
-            await roleManager.UpdateAsync(systemAdminRole);
+            if (!systemAdminRole.IsSystemRole)
+            {
+                systemAdminRole.IsSystemRole = true;
+                await roleManager.UpdateAsync(systemAdminRole);
+                logger.LogInformation("[Seed]   Role patched  : {Role} — marked system-protected.", SystemRoleNames.SystemAdmin);
+            }
+            else
+            {
+                logger.LogInformation("[Seed]   Role skipped  : {Role} (already exists)", SystemRoleNames.SystemAdmin);
+            }
         }
 
         // ── Regular roles ─────────────────────────────────────────────────────────────
         ApplicationRole? staffRole = await roleManager.FindByNameAsync("Staff");
-        ApplicationRole? userRole = await roleManager.FindByNameAsync("User");
+        ApplicationRole? userRole  = await roleManager.FindByNameAsync("User");
 
         if (staffRole is null)
         {
-            staffRole = new ApplicationRole { Id = Guid.NewGuid(), Name = "Staff", Description = "Staff member with limited access" };
+            staffRole = new ApplicationRole { Id = Guid.NewGuid(), Name = "Staff", Description = "Staff member with limited access", IsSystemRole = true };
             await roleManager.CreateAsync(staffRole);
+            logger.LogInformation("[Seed]   Role created  : Staff (system-protected)");
+        }
+        else
+        {
+            if (!staffRole.IsSystemRole)
+            {
+                staffRole.IsSystemRole = true;
+                await roleManager.UpdateAsync(staffRole);
+                logger.LogInformation("[Seed]   Role patched  : Staff — marked system-protected.");
+            }
+            else
+            {
+                logger.LogInformation("[Seed]   Role skipped  : Staff (already exists)");
+            }
         }
 
         if (userRole is null)
         {
-            userRole = new ApplicationRole { Id = Guid.NewGuid(), Name = "User", Description = "Regular user with minimal access" };
+            userRole = new ApplicationRole { Id = Guid.NewGuid(), Name = "User", Description = "Regular user with minimal access", IsSystemRole = true };
             await roleManager.CreateAsync(userRole);
+            logger.LogInformation("[Seed]   Role created  : User (system-protected)");
+        }
+        else
+        {
+            if (!userRole.IsSystemRole)
+            {
+                userRole.IsSystemRole = true;
+                await roleManager.UpdateAsync(userRole);
+                logger.LogInformation("[Seed]   Role patched  : User — marked system-protected.");
+            }
+            else
+            {
+                logger.LogInformation("[Seed]   Role skipped  : User (already exists)");
+            }
         }
 
         // Assign permissions to roles — both protected roles get full access
@@ -436,7 +532,9 @@ public static class SeedData
             "business:read", "business:write",
             "costing:read", "costing:write",
             "warehouse:read", "warehouse:create", "warehouse:update",
-            "analytics:read", "reports:read"
+            "analytics:read", "reports:read",
+            // Self-data: Staff can view/edit their own profile
+            "users:profiles:self",
         ]);
         await AssignPermissionsToRoleAsync(context, userRole, permissions,
         [
@@ -444,7 +542,9 @@ public static class SeedData
             "sales:read",
             "customers:read",
             "purchase:read",
-            "analytics:read", "reports:read"
+            "analytics:read", "reports:read",
+            // Self-data: User can view/edit their own profile
+            "users:profiles:self",
         ]);
 
         return (ownerRole, systemAdminRole, staffRole, userRole);
@@ -484,91 +584,83 @@ public static class SeedData
         ApplicationRole ownerRole,
         ApplicationRole systemAdminRole,
         ApplicationRole staffRole,
-        ApplicationRole userRole)
+        ApplicationRole userRole,
+        ILogger logger)
     {
-        // Admin user (Owner)
+        static ApplicationUser MakeUser(string email, string fullName) => new()
+        {
+            Id             = Guid.NewGuid(),
+            Email          = email,
+            UserName       = email,
+            FullName       = fullName,
+            EmailConfirmed = true,
+            IsActive       = true,
+            CreatedAtUtc   = DateTimeOffset.UtcNow
+        };
+
+        // Admin user — Owner
         if (await userManager.FindByEmailAsync("admin@example.com") is null)
         {
-            var adminUser = new ApplicationUser
-            {
-                Id = Guid.NewGuid(),
-                Email = "admin@example.com",
-                UserName = "admin@example.com",
-                FullName = "Admin User",
-                EmailConfirmed = true,
-                IsActive = true,
-                CreatedAtUtc = DateTimeOffset.UtcNow
-            };
-            await userManager.CreateAsync(adminUser, "AdminPassword123!");
-            await userManager.AddToRoleAsync(adminUser, ownerRole.Name!);
+            var u = MakeUser("admin@example.com", "Admin User");
+            await userManager.CreateAsync(u, "AdminPassword123!");
+            await userManager.AddToRoleAsync(u, ownerRole.Name!);
+            logger.LogInformation("[Seed]   User created  : {Email}  role={Role}", u.Email, ownerRole.Name);
+        }
+        else
+        {
+            logger.LogInformation("[Seed]   User skipped  : admin@example.com (already exists)");
         }
 
-        // System administrator seed user
+        // System administrator
         if (await userManager.FindByEmailAsync("sysadmin@example.com") is null)
         {
-            var sysAdminUser = new ApplicationUser
-            {
-                Id = Guid.NewGuid(),
-                Email = "sysadmin@example.com",
-                UserName = "sysadmin@example.com",
-                FullName = "System Administrator",
-                EmailConfirmed = true,
-                IsActive = true,
-                CreatedAtUtc = DateTimeOffset.UtcNow
-            };
-            await userManager.CreateAsync(sysAdminUser, "SysAdminPassword123!");
-            await userManager.AddToRoleAsync(sysAdminUser, systemAdminRole.Name!);
+            var u = MakeUser("sysadmin@example.com", "System Administrator");
+            await userManager.CreateAsync(u, "SysAdminPassword123!");
+            await userManager.AddToRoleAsync(u, systemAdminRole.Name!);
+            logger.LogInformation("[Seed]   User created  : {Email}  role={Role}", u.Email, systemAdminRole.Name);
+        }
+        else
+        {
+            logger.LogInformation("[Seed]   User skipped  : sysadmin@example.com (already exists)");
         }
 
-        // Accountant user (Staff)
+        // Accountant — Staff
         if (await userManager.FindByEmailAsync("accountant@example.com") is null)
         {
-            var accountantUser = new ApplicationUser
-            {
-                Id = Guid.NewGuid(),
-                Email = "accountant@example.com",
-                UserName = "accountant@example.com",
-                FullName = "Accountant User",
-                EmailConfirmed = true,
-                IsActive = true,
-                CreatedAtUtc = DateTimeOffset.UtcNow
-            };
-            await userManager.CreateAsync(accountantUser, "AccountantPassword123!");
-            await userManager.AddToRoleAsync(accountantUser, staffRole.Name!);
+            var u = MakeUser("accountant@example.com", "Accountant User");
+            await userManager.CreateAsync(u, "AccountantPassword123!");
+            await userManager.AddToRoleAsync(u, staffRole.Name!);
+            logger.LogInformation("[Seed]   User created  : {Email}  role={Role}", u.Email, staffRole.Name);
+        }
+        else
+        {
+            logger.LogInformation("[Seed]   User skipped  : accountant@example.com (already exists)");
         }
 
-        // Sales user (Staff)
+        // Sales — Staff
         if (await userManager.FindByEmailAsync("sales@example.com") is null)
         {
-            var salesUser = new ApplicationUser
-            {
-                Id = Guid.NewGuid(),
-                Email = "sales@example.com",
-                UserName = "sales@example.com",
-                FullName = "Sales User",
-                EmailConfirmed = true,
-                IsActive = true,
-                CreatedAtUtc = DateTimeOffset.UtcNow
-            };
-            await userManager.CreateAsync(salesUser, "SalesPassword123!");
-            await userManager.AddToRoleAsync(salesUser, staffRole.Name!);
+            var u = MakeUser("sales@example.com", "Sales User");
+            await userManager.CreateAsync(u, "SalesPassword123!");
+            await userManager.AddToRoleAsync(u, staffRole.Name!);
+            logger.LogInformation("[Seed]   User created  : {Email}  role={Role}", u.Email, staffRole.Name);
+        }
+        else
+        {
+            logger.LogInformation("[Seed]   User skipped  : sales@example.com (already exists)");
         }
 
-        // Regular user (User)
+        // Regular user — User
         if (await userManager.FindByEmailAsync("user1@example.com") is null)
         {
-            var regularUser = new ApplicationUser
-            {
-                Id = Guid.NewGuid(),
-                Email = "user1@example.com",
-                UserName = "user1@example.com",
-                FullName = "Regular User",
-                EmailConfirmed = true,
-                IsActive = true,
-                CreatedAtUtc = DateTimeOffset.UtcNow
-            };
-            await userManager.CreateAsync(regularUser, "UserPassword123!");
-            await userManager.AddToRoleAsync(regularUser, userRole.Name!);
+            var u = MakeUser("user1@example.com", "Regular User");
+            await userManager.CreateAsync(u, "UserPassword123!");
+            await userManager.AddToRoleAsync(u, userRole.Name!);
+            logger.LogInformation("[Seed]   User created  : {Email}  role={Role}", u.Email, userRole.Name);
+        }
+        else
+        {
+            logger.LogInformation("[Seed]   User skipped  : user1@example.com (already exists)");
         }
     }
 
@@ -579,11 +671,16 @@ public static class SeedData
     /// </summary>
     private static async Task SeedBusinessesAndMembershipsAsync(
         ApplicationDbContext context,
-        UserManager<ApplicationUser> userManager)
+        UserManager<ApplicationUser> userManager,
+        ILogger logger)
     {
         // Skip if any UserBusiness record already exists
         if (await context.UserBusinesses.AnyAsync())
+        {
+            var bizCount = await context.Businesses.CountAsync();
+            logger.LogInformation("[Seed]   Businesses — skipped ({Count} already in DB).", bizCount);
             return;
+        }
 
         // ── Demo businesses ──────────────────────────────────────────────────
         var abcGroupId = Guid.NewGuid();
@@ -617,11 +714,15 @@ public static class SeedData
                     CreatedAtUtc = DateTimeOffset.UtcNow
                 });
             await context.SaveChangesAsync();
+            logger.LogInformation("[Seed]   Business created: ABC Group  (id={Id})", abcGroupId);
+            logger.LogInformation("[Seed]   Business created: XYZ Tech   (id={Id})", xyzTechId);
         }
         else
         {
             abcGroupId = (await context.Businesses.FirstAsync(b => b.Name == "ABC Group")).Id;
-            xyzTechId = (await context.Businesses.FirstAsync(b => b.Name == "XYZ Tech")).Id;
+            xyzTechId  = (await context.Businesses.FirstAsync(b => b.Name == "XYZ Tech")).Id;
+            logger.LogInformation("[Seed]   Business skipped: ABC Group (already exists)");
+            logger.LogInformation("[Seed]   Business skipped: XYZ Tech  (already exists)");
         }
 
         // ── User → Business memberships ──────────────────────────────────────
@@ -656,6 +757,7 @@ public static class SeedData
 
         await context.UserBusinesses.AddRangeAsync(userBusinesses);
         await context.SaveChangesAsync();
+        logger.LogInformation("[Seed]   Memberships   : {Count} user-business link(s) created.", userBusinesses.Count);
     }
 
     /// <summary>
@@ -666,21 +768,33 @@ public static class SeedData
     /// </summary>
     private static async Task SeedOwnershipAndLicenseAsync(
         ApplicationDbContext context,
-        UserManager<ApplicationUser> userManager)
+        UserManager<ApplicationUser> userManager,
+        ILogger logger)
     {
         // Resolve the two demo businesses by name (they must already exist)
         var abcGroup = await context.Businesses.FirstOrDefaultAsync(b => b.Name == "ABC Group");
-        var xyzTech = await context.Businesses.FirstOrDefaultAsync(b => b.Name == "XYZ Tech");
-        if (abcGroup is null || xyzTech is null) return;  // businesses not seeded yet
+        var xyzTech  = await context.Businesses.FirstOrDefaultAsync(b => b.Name == "XYZ Tech");
+        if (abcGroup is null || xyzTech is null)
+        {
+            logger.LogWarning("[Seed]   Ownership & license — demo businesses not found, skipped.");
+            return;
+        }
 
         Guid abcGroupId = abcGroup.Id;
         Guid xyzTechId  = xyzTech.Id;
         var admin = await userManager.FindByEmailAsync("admin@example.com");
-        if (admin is null) return;
+        if (admin is null)
+        {
+            logger.LogWarning("[Seed]   Ownership & license — admin@example.com not found, skipped.");
+            return;
+        }
 
         // Already seeded?
         if (await context.BusinessOwnerships.AnyAsync(o => o.OwnerId == admin.Id))
+        {
+            logger.LogInformation("[Seed]   Ownership & license — skipped (already seeded for admin@example.com).");
             return;
+        }
 
         // Create an Enterprise license for the demo owner (no expiry, full features)
         var license = new BusinessDomain.BusinessLicense
@@ -730,6 +844,9 @@ public static class SeedData
 
         await context.BusinessOwnerships.AddRangeAsync(ownerships);
         await context.SaveChangesAsync();
+        logger.LogInformation("[Seed]   License created : Plan={Plan}  OwnerId={OwnerId}  LicenseId={LicenseId}",
+            license.Plan, admin.Id, license.Id);
+        logger.LogInformation("[Seed]   Ownership wired : admin@example.com → ABC Group, XYZ Tech");
     }
 
     private static async Task ApplyLicenseMappingsFromFileAsync(
@@ -760,15 +877,17 @@ public static class SeedData
         };
         jsonOptions.Converters.Add(new JsonStringEnumConverter());
 
-        var doc = JsonSerializer.Deserialize<LicenseMappingSeedDocument>(json, jsonOptions);
-        if (doc is null || doc.Users.Count == 0)
+        // Deserialize using the shared GitHubLicenseMappingRoot contract so the
+        // local seed file and the remote GitHub file share exactly the same shape.
+        var doc = JsonSerializer.Deserialize<GitHubLicenseMappingRoot>(json, jsonOptions);
+        if (doc is null || doc.Licenses.Count == 0)
         {
-            logger.LogInformation("[Seed] No user-license mappings found in {Source}.", source.Value.Source);
+            logger.LogInformation("[Seed] No license mappings found in {Source}.", source.Value.Source);
             return;
         }
 
         // Validate duplicate emails in seed file (case-insensitive)
-        var duplicateEmails = doc.Users
+        var duplicateEmails = doc.Licenses
             .GroupBy(u => u.Email.Trim().ToLowerInvariant())
             .Where(g => g.Count() > 1)
             .Select(g => g.Key)
@@ -778,7 +897,7 @@ public static class SeedData
             throw new InvalidOperationException($"Duplicate email(s) in license mapping file: {string.Join(", ", duplicateEmails)}");
 
         // Validate duplicate license keys in seed file (hashed before storing)
-        var duplicateKeys = doc.Users
+        var duplicateKeys = doc.Licenses
             .Where(u => !string.IsNullOrWhiteSpace(u.License.LicenseKey))
             .Select(u => HashLicenseKey(u.License.LicenseKey))
             .GroupBy(k => k)
@@ -791,18 +910,24 @@ public static class SeedData
 
         var defaultPassword = configuration["Seed:LicenseMapping:DefaultPassword"];
 
-        foreach (var item in doc.Users)
+        var mappingCreated = 0;
+        var mappingUpdated = 0;
+        var mappingSkipped = 0;
+
+        foreach (var item in doc.Licenses)
         {
             var email = item.Email.Trim().ToLowerInvariant();
             var user = await userManager.FindByEmailAsync(email);
+            var userAction = "existing";
 
             if (user is null)
             {
                 if (string.IsNullOrWhiteSpace(defaultPassword))
                 {
                     logger.LogWarning(
-                        "[Seed] User '{Email}' not found and no Seed:LicenseMapping:DefaultPassword configured. Skipping creation.",
+                        "[Seed]   Mapping skipped : '{Email}' — user not found and Seed:LicenseMapping:DefaultPassword not set.",
                         email);
+                    mappingSkipped++;
                     continue;
                 }
 
@@ -821,29 +946,21 @@ public static class SeedData
                 if (!createResult.Succeeded)
                 {
                     logger.LogError(
-                        "[Seed] Failed to create user '{Email}': {Errors}",
+                        "[Seed]   Mapping failed  : '{Email}' — {Errors}",
                         email,
                         string.Join("; ", createResult.Errors.Select(e => e.Description)));
+                    mappingSkipped++;
                     continue;
                 }
 
                 user = newUser;
+                userAction = "created";
             }
 
-            // Role mapping (defaults to Owner if not specified)
-            var targetRoles = item.Roles.Count > 0 ? item.Roles : [SystemRoleNames.Owner];
-            foreach (var roleName in targetRoles.Distinct(StringComparer.OrdinalIgnoreCase))
-            {
-                var role = await roleManager.FindByNameAsync(roleName);
-                if (role is null)
-                {
-                    logger.LogWarning("[Seed] Role '{Role}' not found for user '{Email}'.", roleName, email);
-                    continue;
-                }
-
-                if (!await userManager.IsInRoleAsync(user, role.Name!))
-                    await userManager.AddToRoleAsync(user, role.Name!);
-            }
+            // All entries in the license mapping file are Owners by design.
+            // Assign the Owner role if not already held.
+            if (!await userManager.IsInRoleAsync(user, SystemRoleNames.Owner))
+                await userManager.AddToRoleAsync(user, SystemRoleNames.Owner);
 
             var hashedLicenseKey = HashLicenseKey(item.License.LicenseKey);
 
@@ -882,8 +999,16 @@ public static class SeedData
                 license.ModifiedAtUtc = DateTimeOffset.UtcNow;
             }
 
-            license.Plan = item.License.Plan;
-            license.Status = item.License.Status;
+            // GitHubLicenseDetail uses string Plan/Status — parse to domain enums.
+            if (!Enum.TryParse<BusinessDomain.LicensePlan>(item.License.Plan, ignoreCase: true, out var parsedPlan))
+                parsedPlan = BusinessDomain.LicensePlan.Professional;
+            if (!Enum.TryParse<BusinessDomain.LicenseStatus>(item.License.Status, ignoreCase: true, out var parsedStatus))
+                parsedStatus = BusinessDomain.LicenseStatus.Active;
+
+            var isNewLicense = license.CreatedAtUtc == license.ModifiedAtUtc || license.ModifiedAtUtc is null;
+
+            license.Plan = parsedPlan;
+            license.Status = parsedStatus;
             license.MaxBusinesses = item.License.MaxBusinesses;
             license.MaxBranchesPerBusiness = item.License.MaxBranchesPerBusiness;
             license.MaxEmployees = item.License.MaxEmployees;
@@ -897,11 +1022,37 @@ public static class SeedData
 
             await context.SaveChangesAsync();
 
-            if (item.BusinessNames.Count == 0) continue;
+            if (isNewLicense) mappingCreated++; else mappingUpdated++;
+
+            logger.LogInformation(
+                "[Seed]   Mapping {Action}: {Email}  user={UserAction}  plan={Plan}  status={Status}  expires={Expires}  businessIds={BizCount}",
+                isNewLicense ? "created" : "updated",
+                email,
+                userAction,
+                parsedPlan,
+                parsedStatus,
+                item.License.ExpiresOn.HasValue ? item.License.ExpiresOn.Value.ToString("yyyy-MM-dd") : "perpetual",
+                item.BusinessIds.Count);
+
+            if (item.BusinessIds.Count == 0) continue;
+
+            // BusinessIds in the mapping are stable GUIDs that match db records
+            // (populated by the client after running the business creation wizard).
+            var businessGuids = item.BusinessIds
+                .Select(id => Guid.TryParse(id, out var g) ? g : (Guid?)null)
+                .Where(g => g.HasValue)
+                .Select(g => g!.Value)
+                .ToList();
 
             var businesses = await context.Businesses
-                .Where(b => item.BusinessNames.Contains(b.Name))
+                .Where(b => businessGuids.Contains(b.Id))
                 .ToListAsync();
+
+            var unmatched = businessGuids.Except(businesses.Select(b => b.Id)).ToList();
+            if (unmatched.Count > 0)
+                logger.LogWarning(
+                    "[Seed]   Mapping warning : {Email} — {Count} businessId(s) not found in DB: {Ids}",
+                    email, unmatched.Count, string.Join(", ", unmatched));
 
             var hasDefaultMembership = await context.UserBusinesses
                 .AnyAsync(ub => ub.UserId == user.Id && ub.IsDefault);
@@ -948,6 +1099,10 @@ public static class SeedData
 
             await context.SaveChangesAsync();
         }
+
+        logger.LogInformation(
+            "[Seed]   License mapping complete — created={Created}  updated={Updated}  skipped={Skipped}",
+            mappingCreated, mappingUpdated, mappingSkipped);
     }
 
     private static async Task<(string Json, string Source)?> LoadLicenseMappingJsonAsync(
@@ -1051,48 +1206,9 @@ public static class SeedData
         return $"seed_sha256:{Convert.ToHexString(bytes).ToLowerInvariant()}";
     }
 
-    private sealed record LicenseMappingSeedDocument(IReadOnlyList<LicenseMappingSeedUser> Users)
-    {
-        public IReadOnlyList<LicenseMappingSeedUser> Users { get; init; } = Users;
-    }
-
-    private sealed record LicenseMappingSeedUser(
-        string Email,
-        string? FullName,
-        IReadOnlyList<string> Roles,
-        IReadOnlyList<string> BusinessNames,
-        LicenseMappingSeedLicense License)
-    {
-        public string Email { get; init; } = Email;
-        public string? FullName { get; init; } = FullName;
-        public IReadOnlyList<string> Roles { get; init; } = Roles ?? [];
-        public IReadOnlyList<string> BusinessNames { get; init; } = BusinessNames ?? [];
-        public LicenseMappingSeedLicense License { get; init; } = License;
-    }
-
-    private sealed record LicenseMappingSeedLicense(
-        string LicenseKey,
-        BusinessDomain.LicensePlan Plan,
-        BusinessDomain.LicenseStatus Status,
-        int MaxBusinesses,
-        int MaxBranchesPerBusiness,
-        int MaxEmployees,
-        bool AllowAdvancedReporting,
-        bool AllowMultiCurrency,
-        bool AllowIntegrations,
-        DateOnly StartsOn,
-        DateOnly? ExpiresOn)
-    {
-        public string LicenseKey { get; init; } = LicenseKey;
-        public BusinessDomain.LicensePlan Plan { get; init; } = Plan;
-        public BusinessDomain.LicenseStatus Status { get; init; } = Status;
-        public int MaxBusinesses { get; init; } = MaxBusinesses;
-        public int MaxBranchesPerBusiness { get; init; } = MaxBranchesPerBusiness;
-        public int MaxEmployees { get; init; } = MaxEmployees;
-        public bool AllowAdvancedReporting { get; init; } = AllowAdvancedReporting;
-        public bool AllowMultiCurrency { get; init; } = AllowMultiCurrency;
-        public bool AllowIntegrations { get; init; } = AllowIntegrations;
-        public DateOnly StartsOn { get; init; } = StartsOn;
-        public DateOnly? ExpiresOn { get; init; } = ExpiresOn;
-    }
+    // NOTE: LicenseMappingSeedDocument, LicenseMappingSeedUser, and
+    // LicenseMappingSeedLicense have been removed.  The seed pipeline now
+    // deserialises the local file directly into GitHubLicenseMappingRoot
+    // (defined in Monolithic.Api.Modules.Business.Contracts) so the local
+    // seed file and the remote GitHub mapping share a single schema.
 }

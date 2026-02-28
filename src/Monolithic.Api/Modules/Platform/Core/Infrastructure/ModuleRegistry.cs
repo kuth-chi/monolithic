@@ -2,6 +2,7 @@ using System.Reflection;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Monolithic.Api.Modules.Identity.Authorization;
 using Monolithic.Api.Modules.Platform.Core.Abstractions;
 
 namespace Monolithic.Api.Modules.Platform.Core.Infrastructure;
@@ -166,6 +167,7 @@ public sealed class ModuleRegistry
 
         services.AddAuthorization(auth =>
         {
+            // ── Standard RBAC policies (one per module permission) ─────────────
             foreach (var perm in allPermissions)
             {
                 if (auth.GetPolicy(perm.Permission) is not null) continue;
@@ -174,11 +176,26 @@ public sealed class ModuleRegistry
                     policy.RequireAuthenticatedUser()
                           .RequireClaim("permission", perm.Permission));
             }
+
+            // ── Resource-based ABAC policies (self-data) ──────────────────────
+            // These are evaluated with IAuthorizationService.AuthorizeAsync(User, resource, policyName)
+            // and require the SelfOwnershipAuthorizationHandler to be registered in DI.
+            foreach (var (policyName, requirement) in SelfDataPolicies.All())
+            {
+                if (auth.GetPolicy(policyName) is not null) continue;
+
+                auth.AddPolicy(policyName, policy =>
+                {
+                    policy.RequireAuthenticatedUser();
+                    policy.AddRequirements(requirement);
+                });
+            }
         });
 
         _logger.LogInformation(
-            "[ModuleRegistry] Seeded {Count} RBAC authorization policies.",
-            allPermissions.Count);
+            "[ModuleRegistry] Seeded {Count} RBAC policies + {SelfCount} self-data ABAC policies.",
+            allPermissions.Count,
+            SelfDataPolicies.All().Count());
     }
 
     // ── Kahn's Algorithm — Topological Sort ───────────────────────────────────

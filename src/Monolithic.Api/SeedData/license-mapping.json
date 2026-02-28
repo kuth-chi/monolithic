@@ -1,10 +1,22 @@
 {
-  "users": [
+  "licenses": [
     {
       "email": "admin@example.com",
       "fullName": "Admin User",
-      "roles": ["Owner"],
-      "businessNames": ["ABC Group", "XYZ Tech"],
+      "contacts": [
+        {
+          "name": "Admin User",
+          "title": "owner",
+          "contact": [
+            { "kind": "phone",    "key": "+1 555 000 0001" },
+            { "kind": "facebook", "key": "fb.me/admin" }
+          ]
+        }
+      ],
+      "businessIds": [
+        "00000000-0000-0000-0000-0000000abc01",
+        "00000000-0000-0000-0000-0000000abc02"
+      ],
       "license": {
         "licenseKey": "LIC-ENT-ADMIN-CHANGE-ME-001",
         "plan": "Enterprise",
@@ -22,8 +34,18 @@
     {
       "email": "sysadmin@example.com",
       "fullName": "System Administrator",
-      "roles": ["System Admin"],
-      "businessNames": ["ABC Group"],
+      "contacts": [
+        {
+          "name": "System Administrator",
+          "title": "owner",
+          "contact": [
+            { "kind": "phone", "key": "+1 555 000 0002" }
+          ]
+        }
+      ],
+      "businessIds": [
+        "00000000-0000-0000-0000-0000000sys01"
+      ],
       "license": {
         "licenseKey": "LIC-PRO-SYSADMIN-CHANGE-ME-002",
         "plan": "Professional",

@@ -128,4 +128,28 @@ public abstract class ModuleBase : IModule
             Description:  description,
             DefaultRoles: defaultRoles,
             IsSensitive:  isSensitive);
+
+    /// <summary>
+    /// Builds a <b>self-data</b> <see cref="PermissionDescriptor"/> scoped to this module.
+    ///
+    /// The permission key is always <c>"{ModuleId}:{resource}:self"</c>.
+    /// This permission uses resource-based authorization via
+    /// <c>SelfOwnershipAuthorizationHandler</c>: the role holder may
+    /// access only the records they own.
+    ///
+    /// Example output key: <c>"users:profiles:self"</c>
+    /// </summary>
+    protected PermissionDescriptor PermSelf(
+        string    resource,
+        string    displayName,
+        string?   description  = null,
+        string[]? defaultRoles = null)
+        => new(
+            Permission:   $"{ModuleId}:{resource}:self",
+            DisplayName:  displayName,
+            ModuleId:     ModuleId,
+            Description:  description,
+            DefaultRoles: defaultRoles,
+            IsSensitive:  false,
+            IsSelfData:   true);
 }

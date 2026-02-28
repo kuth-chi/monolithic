@@ -42,10 +42,22 @@ public sealed class UsersModule : ModuleBase
 
     public override IEnumerable<PermissionDescriptor> GetPermissions()
     {
-        yield return Perm("profiles", "read",   "View User Profiles",         defaultRoles: ["admin", "manager"]);
-        yield return Perm("profiles", "write",  "Edit User Profiles",         defaultRoles: ["admin"]);
-        yield return Perm("profiles", "delete", "Deactivate Users",           defaultRoles: ["admin"],  isSensitive: true);
+        // ── Elevated / admin-level ─────────────────────────────────────────────
+        yield return Perm("profiles", "read",   "View User Profiles",         defaultRoles: ["admin", "manager"],
+            description: "View any user\'s profile and account details.");
+        yield return Perm("profiles", "write",  "Edit User Profiles",         defaultRoles: ["admin"],
+            description: "Edit any user\'s profile details (admin override).");
+        yield return Perm("profiles", "delete", "Deactivate Users",           defaultRoles: ["admin"],  isSensitive: true,
+            description: "Soft-delete or deactivate a user account.");
         yield return Perm("roles",    "read",   "View Roles",                 defaultRoles: ["admin", "manager"]);
         yield return Perm("roles",    "admin",  "Manage Roles & Permissions", defaultRoles: ["admin"],  isSensitive: true);
+
+        // ── Self-data (ownership-scoped) ───────────────────────────────────────
+        // Granted to Staff and User roles so every authenticated user can
+        // read and update their OWN profile.  Resource-based authorization
+        // (SelfOwnershipAuthorizationHandler) enforces ownership at runtime.
+        yield return PermSelf("profiles", "View & Edit Own Profile",
+            description: "Read and write own user profile. Cannot access other users\' data.",
+            defaultRoles: ["Owner", "System Admin", "Staff", "User"]);
     }
 }

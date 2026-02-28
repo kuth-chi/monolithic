@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Monolithic.Api.Common.Caching;
+using Monolithic.Api.Common.Results;
 using Monolithic.Api.Modules.Identity.Domain;
 using Monolithic.Api.Modules.Users.Contracts;
 
@@ -11,9 +12,12 @@ public sealed class IdentityBackedUserService(
 {
     private const string DefaultPassword = "TempPassword123!";
 
+    // ── Admin-level list / create ──────────────────────────────────────────
+
     public async Task<IReadOnlyCollection<UserDto>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         var users = userManager.Users
+            .Where(u => !u.IsDeleted)
             .OrderByDescending(u => u.CreatedAtUtc)
             .ToList();
 
@@ -27,22 +31,15 @@ public sealed class IdentityBackedUserService(
         return userDtos.AsReadOnly();
     }
 
-    public async Task<UserDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
-    {
-        var user = await userManager.FindByIdAsync(id.ToString());
-        if (user is null)
-            return null;
-
-        var roles = await userManager.GetRolesAsync(user);
-        return MapToDto(user, roles);
-    }
+    public Task<int> GetCountAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(userManager.Users.Count(u => !u.IsDeleted));
 
     public async Task<UserDto> CreateAsync(CreateUserRequest request, CancellationToken cancellationToken = default)
     {
         var user = new ApplicationUser
         {
             UserName = request.Email.Trim().ToLowerInvariant(),
-            Email = request.Email.Trim().ToLowerInvariant(),
+            Email    = request.Email.Trim().ToLowerInvariant(),
             FullName = request.FullName.Trim(),
             IsActive = true,
             CreatedAtUtc = DateTimeOffset.UtcNow
@@ -55,7 +52,6 @@ public sealed class IdentityBackedUserService(
                 $"Failed to create user: {string.Join(", ", result.Errors.Select(e => e.Description))}");
         }
 
-        // Assign requested roles
         var validRoles = request.Roles
             .Select(r => r.Trim())
             .Where(r => r.Length > 0)
@@ -72,27 +68,81 @@ public sealed class IdentityBackedUserService(
             }
         }
 
-        // Invalidate dashboard cache
         await cache.RemoveAsync(CacheKeys.DashboardRealtimeSnapshotV1, cancellationToken);
-
         return MapToDto(user, validRoles);
     }
 
-    public Task<int> GetCountAsync(CancellationToken cancellationToken = default)
+    // ── Profile read / write (self-data + admin-elevated) ──────────────────
+
+    public async Task<Result<UserProfileDto>> GetProfileAsync(
+        Guid id, CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(userManager.Users.Count());
+        var user = await userManager.FindByIdAsync(id.ToString());
+
+        if (user is null || user.IsDeleted)
+            return Error.NotFound("User.NotFound", $"User '{id}' was not found.");
+
+        var roles = await userManager.GetRolesAsync(user);
+        return MapToProfileDto(user, roles);
     }
 
-    private static UserDto MapToDto(ApplicationUser user, IEnumerable<string> roles)
+    public async Task<Result<UserProfileDto>> UpdateProfileAsync(
+        Guid id, UpdateProfileRequest request, CancellationToken cancellationToken = default)
     {
-        return new UserDto
+        // Inline validation
+        var validator = new UpdateProfileRequestValidator();
+        var validation = validator.Validate(request);
+        if (!validation.IsValid)
         {
-            Id = user.Id,
-            FullName = user.FullName,
-            Email = user.Email ?? string.Empty,
-            Roles = roles.ToArray(),
-            Permissions = [], // Permissions come from Identity module, not Users module
-            CreatedAtUtc = user.CreatedAtUtc
-        };
+            var errors = validation.Errors
+                .GroupBy(f => f.PropertyName)
+                .ToDictionary(g => g.Key, g => g.Select(f => f.ErrorMessage).ToArray());
+
+            return Error.Validation("UpdateProfile.Invalid",
+                "One or more validation errors occurred.", errors);
+        }
+
+        var user = await userManager.FindByIdAsync(id.ToString());
+        if (user is null || user.IsDeleted)
+            return Error.NotFound("User.NotFound", $"User '{id}' was not found.");
+
+        user.FullName    = request.FullName.Trim();
+        user.PhoneNumber = request.PhoneNumber?.Trim();
+
+        var result = await userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+        {
+            var errs = string.Join("; ", result.Errors.Select(e => e.Description));
+            return Error.Validation("UpdateProfile.Failed", errs);
+        }
+
+        var roles = await userManager.GetRolesAsync(user);
+        return MapToProfileDto(user, roles);
     }
+
+    // ── Mappers ───────────────────────────────────────────────────────────
+
+    private static UserDto MapToDto(ApplicationUser user, IEnumerable<string> roles)
+        => new()
+        {
+            Id          = user.Id,
+            FullName    = user.FullName,
+            Email       = user.Email ?? string.Empty,
+            Roles       = roles.ToArray(),
+            Permissions = [],  // served by Identity module JWT
+            CreatedAtUtc = user.CreatedAtUtc,
+        };
+
+    private static UserProfileDto MapToProfileDto(ApplicationUser user, IEnumerable<string> roles)
+        => new()
+        {
+            Id           = user.Id,
+            FullName     = user.FullName,
+            Email        = user.Email ?? string.Empty,
+            PhoneNumber  = user.PhoneNumber,
+            IsActive     = user.IsActive,
+            CreatedAtUtc = user.CreatedAtUtc,
+            LastLoginUtc = user.LastLoginUtc,
+            Roles        = roles.ToArray(),
+        };
 }

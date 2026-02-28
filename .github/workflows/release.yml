@@ -1,21 +1,24 @@
 name: Release — Build, Test & Push to Docker Hub
 
 # ─────────────────────────────────────────────────────────────────────────────
-# DEPLOYMENT WORKFLOW
-# ───────────────────
-#   1. Do your work on the dev branch.
-#   2. Merge dev → main  (manually via PR or git merge).
-#   3. On main, apply a semver tag and push it:
+# RELEASE WORKFLOW  (tag-based + GitHub Release + manual dispatch)
+# ───────────────────────────────────────────────────────────────
+# This workflow handles ALL tag events.  Behaviour differs by origin branch:
+#
+#   Semver tag pushed from  dev   →  validate-tag + test  (no Docker push)
+#   Semver tag pushed from  main  →  validate-tag + test + docker-release
+#   GitHub Release published      →  full pipeline  (validate-tag + test + docker-release)
+#   Manual dispatch               →  full pipeline
+#
+# Branch CI (push to main / dev without a tag) is handled by ci.yml.
+#
+# HOW TO RELEASE
+# ──────────────
+#   1. Do work on dev, merge dev → main via PR.
+#   2. On main, apply a semver tag and push it:
 #        git tag -a v1.2.3 -m "Release notes"
 #        git push origin v1.2.3
-#   4. GitHub Actions fires automatically → test → build → push Docker Hub.
-#
-# TRIGGERS
-#   • Tag pushed to main  (primary path — after merging dev → main)
-#     — Tag MUST be strict semver: v1.2.3 (stable) or v1.2.3-rc.1 (pre-release).
-#     — validate-tag job enforces the format and fails fast on bad tags.
-#   • Manual dispatch from the GitHub Actions UI  (re-publish / hotfix)
-#   • GitHub Release published  (legacy fallback — still supported)
+#   3. GitHub Actions fires → validate → test → build → push Docker Hub.
 #
 # SEMVER CHEAT-SHEET
 # ──────────────────
@@ -28,11 +31,12 @@ name: Release — Build, Test & Push to Docker Hub
 #
 # JOB PIPELINE
 # ────────────
-#   validate-tag  →  test  →  docker-release
+#   validate-tag  →  test  →  docker-release (gated — see conditions below)
 #
 #   validate-tag   verifies strict semver, exposes `version` + `is_prerelease`
 #   test           restores, builds, and runs the full test suite
-#   docker-release builds the image, applies all semver tags, pushes to Docker Hub
+#   docker-release builds the Docker image, applies semver tags, pushes to Docker Hub
+#                  Skipped when tag originates from dev (build-and-test only).
 # ─────────────────────────────────────────────────────────────────────────────
 on:
   push:
@@ -171,6 +175,17 @@ jobs:
     name: Docker Build & Push
     runs-on: ubuntu-latest
     needs: [validate-tag, test]
+    # Gate: only execute the Docker stages when the tag originates from main,
+    # a GitHub Release is published on main, or this workflow is triggered manually.
+    # Tags pushed from dev run only validate-tag + test (no image push).
+    if: |
+      needs.validate-tag.result == 'success' &&
+      needs.test.result == 'success' &&
+      (
+        github.event.base_ref == 'refs/heads/main' ||
+        github.event_name == 'release' ||
+        github.event_name == 'workflow_dispatch'
+      )
 
     steps:
       - name: Checkout source

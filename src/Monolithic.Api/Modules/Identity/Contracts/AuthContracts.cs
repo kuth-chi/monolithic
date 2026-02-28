@@ -62,6 +62,16 @@ public sealed record MeResponse(
 
 // ── Shared value objects ─────────────────────────────────────────────────────
 
+// ── System init probe ───────────────────────────────────────────────────────
+
+/// <summary>
+/// Response for the anonymous <c>GET /api/v1/auth/has-users</c> probe.
+/// The frontend uses this to redirect a brand-new installation straight to /signup
+/// rather than showing the /login page with no existing accounts.
+/// </summary>
+/// <param name="HasUsers"><c>true</c> when at least one active user account exists.</param>
+public sealed record SystemInitResponse(bool HasUsers);
+
 /// <summary>Business membership summary embedded in tokens and profile responses.</summary>
 public sealed record UserBusinessSummary(
     Guid BusinessId,

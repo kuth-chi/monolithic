@@ -83,6 +83,12 @@ public static class LicenseGuardCode
 
     /// <summary>Account suspended after 3 tamper strikes. No API access until admin review.</summary>
     public const string AccountSuspended = "account_suspended";
+
+    /// <summary>
+    /// License has not been remotely validated within the allowed staleness window.
+    /// Still treated as valid but the frontend should prompt a manual re-check.
+    /// </summary>
+    public const string ValidationStale = "validation_stale";
 }
 
 /// <summary>Internal result produced by <see cref="Application.ILicenseGuardService"/>.</summary>
@@ -116,8 +122,13 @@ public sealed class LicenseGuardOptions
     /// </summary>
     public double TamperMonitorIntervalHours { get; set; } = 2;
 
-    /// <summary>
-    /// Remote license mapping URL.
+    /// <summary>    /// Maximum days allowed since the last successful remote validation before the license
+    /// is considered stale. Returns <see cref="LicenseGuardCode.ValidationStale"/> after
+    /// this threshold. 0 = disabled (no staleness check). Default: 7.
+    /// </summary>
+    public int MaxValidationStaleDays { get; set; } = 7;
+
+    /// <summary>    /// Remote license mapping URL.
     /// Overrides the default GitHub URL when set in appsettings.
     /// </summary>
     public string? RemoteMappingUrl { get; set; }

@@ -51,14 +51,19 @@ public sealed class LicenseValidationMiddleware(
     // Within /api/v1/owner/ we DO enforce the license — except for:
     //   • /activate             — license activation requires the business to exist first
     //   • /activation-status    — read-only status polling
-    //   • /businesses           — first-business creation predates any license;
+    //   • /businesses (exact)   — first-business list/create predates any license;
     //                             the service layer performs its own quota guard
-    private static readonly string[] OwnerActivationSuffixes =
+    //
+    // Gap 2 fix: use EndsWith only for the activation sub-paths that include a businessId
+    // segment (e.g. /{guid}/activate).  The /businesses path uses an exact match to prevent
+    // accidental bypass of future routes that happen to end in "businesses".
+    private static readonly string[] OwnerEndSuffixes =
     [
         "/activate",
         "/activation-status",
-        "/businesses",
     ];
+
+    private const string OwnerBusinessesExact = "/api/v1/owner/businesses";
 
     public async Task InvokeAsync(HttpContext context)
     {
@@ -164,14 +169,20 @@ public sealed class LicenseValidationMiddleware(
             if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            // /api/v1/owner/** is only bypassed for activation endpoints
+            // /api/v1/owner/** is only bypassed for specific activation endpoints
             if (prefix.Equals("/api/v1/owner/", StringComparison.OrdinalIgnoreCase))
             {
-                foreach (var suffix in OwnerActivationSuffixes)
+                // Exact match: /api/v1/owner/businesses (list + create; pre-license)
+                if (path.Equals(OwnerBusinessesExact, StringComparison.OrdinalIgnoreCase))
+                    return true;
+
+                // Suffix match: /{businessId}/activate or /{businessId}/activation-status
+                foreach (var suffix in OwnerEndSuffixes)
                 {
                     if (path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
-                        return true;  // bypass activate / activation-status
+                        return true;
                 }
+
                 return false; // enforce license for all other /owner/ routes
             }
 

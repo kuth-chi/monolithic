@@ -95,15 +95,26 @@ public sealed class LicenseGuardService(
         }
 
         // 2. Verify hash integrity — increments strike counter instead of immediate revoke
+        //    Gap 1 fix: treat a blank ValidationHash as suspicious when ExternalSubscriptionId
+        //    is set — an attacker cannot clear the hash to bypass tamper detection.
         if (!string.IsNullOrWhiteSpace(license.ExternalSubscriptionId))
         {
             var expectedHash = ComputeHash(license.ExternalSubscriptionId, ownerId, license.StartsOn);
-            if (!string.IsNullOrWhiteSpace(license.ValidationHash) &&
-                !string.Equals(license.ValidationHash, expectedHash, StringComparison.OrdinalIgnoreCase))
+
+            if (string.IsNullOrWhiteSpace(license.ValidationHash))
+            {
+                // Hash was never stored or was wiped — treat as tamper
+                logger.LogWarning(
+                    "[LicenseGuard] ValidationHash is absent for owner {OwnerId} (ExternalSubscriptionId present). Strike {Count}.",
+                    ownerId, license.TamperCount + 1);
+                return await RecordTamperStrikeAsync(license, ownerId, "Integrity check failed: validation hash missing.", ct);
+            }
+
+            if (!string.Equals(license.ValidationHash, expectedHash, StringComparison.OrdinalIgnoreCase))
             {
                 logger.LogWarning(
                     "[LicenseGuard] Hash mismatch for owner {OwnerId}. Strike {Count}.", ownerId, license.TamperCount + 1);
-                return await RecordTamperStrikeAsync(license, ownerId, "Hash mismatch — potential database tampering.", ct);
+                return await RecordTamperStrikeAsync(license, ownerId, "Integrity check failed: hash mismatch.", ct);
             }
         }
 
@@ -266,17 +277,26 @@ public sealed class LicenseGuardService(
         await db.SaveChangesAsync(ct);
 
         int remaining = maxStrikes - license.TamperCount;
-        var warning   = $"License integrity warning ({license.TamperCount}/{maxStrikes}): {reason} " +
-                        $"{remaining} warning(s) remaining before account suspension.";
 
-        logger.LogWarning("[LicenseGuard] Tamper warning for owner {OwnerId}: {Warning}", ownerId, warning);
+        // Gap 8 fix: keep the internal technical reason in server logs only;
+        // surface a safe, non-revealing message to the client.
+        logger.LogWarning(
+            "[LicenseGuard] Tamper warning for owner {OwnerId} (strike {Count}/{Max}): {InternalReason}",
+            ownerId, license.TamperCount, maxStrikes, reason);
+
+        var publicWarning = $"A license integrity issue was detected on your account " +
+                            $"({license.TamperCount}/{maxStrikes} strikes). " +
+                            $"{remaining} more issue(s) before account suspension. Contact support if this is unexpected.";
+
+        license.TamperWarningMessage = publicWarning;
+        await db.SaveChangesAsync(ct);
 
         return BuildLocalResult(license, options) with
         {
-            Code               = LicenseGuardCode.TamperWarning,
-            Message            = warning,
-            TamperCount        = license.TamperCount,
-            TamperWarningMessage = warning,
+            Code                 = LicenseGuardCode.TamperWarning,
+            Message              = publicWarning,
+            TamperCount          = license.TamperCount,
+            TamperWarningMessage = publicWarning,
         };
     }
 
@@ -334,11 +354,32 @@ public sealed class LicenseGuardService(
             }
         }
 
+        // Gap 5 fix: staleness check — if last remote validation is too old, degrade to warning
+        if (opts.MaxValidationStaleDays > 0 &&
+            license.LastRemoteValidatedAtUtc.HasValue &&
+            (DateTimeOffset.UtcNow - license.LastRemoteValidatedAtUtc.Value).TotalDays > opts.MaxValidationStaleDays)
+        {
+            return new LicenseGuardResult(
+                IsValid:                  true,   // still let through but surface the stale warning
+                Code:                     LicenseGuardCode.ValidationStale,
+                Message:                  $"Your license has not been remotely verified in over {opts.MaxValidationStaleDays} day(s). " +
+                                          "Please ensure your device can reach the license server.",
+                Plan:                     license.Plan,
+                ExpiresOn:                license.ExpiresOn,
+                DaysUntilExpiry:          license.ExpiresOn.HasValue
+                                            ? license.ExpiresOn.Value.DayNumber - today.DayNumber
+                                            : null,
+                IsExpiringSoon:           false,
+                LastRemoteValidatedAtUtc: license.LastRemoteValidatedAtUtc,
+                TamperCount:              license.TamperCount,
+                TamperWarningMessage:     license.TamperWarningMessage);
+        }
+
         return new LicenseGuardResult(
             IsValid:                  true,
             Code:                     license.TamperCount > 0 ? LicenseGuardCode.TamperWarning : LicenseGuardCode.Valid,
             Message:                  license.TamperCount > 0
-                                        ? license.TamperWarningMessage ?? "License integrity warning detected."
+                                        ? license.TamperWarningMessage ?? "A license integrity issue was detected on your account."
                                         : "License is valid.",
             Plan:                     license.Plan,
             ExpiresOn:                license.ExpiresOn,

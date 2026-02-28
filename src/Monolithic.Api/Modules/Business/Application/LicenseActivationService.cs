@@ -277,6 +277,10 @@ public sealed class LicenseActivationService(
         else
         {
             existing.ModifiedAtUtc = DateTimeOffset.UtcNow;
+            // Gap 3 fix: preserve TamperCount + TamperWarningMessage on re-activation.
+            // An attacker cannot reset their strike counter by simply re-activating their license.
+            // Only a hard-delete of the license row (done by LicenseGuardService on suspension)
+            // resets the counter — which happens deliberately as part of the 3-strike penalty.
         }
 
         existing.Plan                   = plan;

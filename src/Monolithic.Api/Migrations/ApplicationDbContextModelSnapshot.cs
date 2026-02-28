@@ -3225,7 +3225,7 @@ namespace Monolithic.Api.Migrations
                         .HasDefaultValue("");
 
                     b.Property<bool>("IsSelfScoped")
-                        .HasColumnType("INTEGER")
+                        .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
                     b.HasKey("Id");

@@ -1,12 +1,21 @@
 name: Release — Build, Test & Push to Docker Hub
 
 # ─────────────────────────────────────────────────────────────────────────────
+# DEPLOYMENT WORKFLOW
+# ───────────────────
+#   1. Do your work on the dev branch.
+#   2. Merge dev → main  (manually via PR or git merge).
+#   3. On main, apply a semver tag and push it:
+#        git tag -a v1.2.3 -m "Release notes"
+#        git push origin v1.2.3
+#   4. GitHub Actions fires automatically → test → build → push Docker Hub.
+#
 # TRIGGERS
-#   • GitHub Release published targeting the main branch  (primary path)
-#     — Create the release in the GitHub UI, set the target branch to main.
+#   • Tag pushed to main  (primary path — after merging dev → main)
 #     — Tag MUST be strict semver: v1.2.3 (stable) or v1.2.3-rc.1 (pre-release).
-#     — Job 0 (validate-tag) enforces the format and fails fast on bad tags.
+#     — validate-tag job enforces the format and fails fast on bad tags.
 #   • Manual dispatch from the GitHub Actions UI  (re-publish / hotfix)
+#   • GitHub Release published  (legacy fallback — still supported)
 #
 # SEMVER CHEAT-SHEET
 # ──────────────────
@@ -26,8 +35,13 @@ name: Release — Build, Test & Push to Docker Hub
 #   docker-release builds the image, applies all semver tags, pushes to Docker Hub
 # ─────────────────────────────────────────────────────────────────────────────
 on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'        # stable:      v1.2.3
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'      # pre-release: v1.2.3-rc.1
+
   release:
-    types: [published]    # fires only when a GitHub Release is published
+    types: [published]    # legacy: fires when a GitHub Release is published
 
   workflow_dispatch:
     inputs:
@@ -65,9 +79,11 @@ jobs:
   validate-tag:
     name: Validate Semver Tag
     runs-on: ubuntu-latest
+    # Fires on: tag push, GitHub Release publish, or manual dispatch
     if: |
+      startsWith(github.ref, 'refs/tags/') ||
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'release' && github.event.release.target_commitish == 'main')
+      github.event_name == 'release'
     outputs:
       version: ${{ steps.parse.outputs.version }}
       is_prerelease: ${{ steps.parse.outputs.is_prerelease }}

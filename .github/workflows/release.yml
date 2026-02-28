@@ -58,6 +58,13 @@ on:
 permissions:
   contents: read
 
+# Serialise Docker releases so concurrent tag pushes don't race to update
+# the "latest" tag on Docker Hub. Only one docker-release runs at a time;
+# any job that arrives while another is running will queue and run after.
+concurrency:
+  group: docker-release
+  cancel-in-progress: false
+
 # Cancel any previous in-progress run for the same ref (tag).
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

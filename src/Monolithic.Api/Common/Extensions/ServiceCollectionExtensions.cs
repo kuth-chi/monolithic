@@ -130,12 +130,13 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(purgeOptions);
         services.AddHostedService<SoftDeletePurgeService>();
 
-        // ── License Guard options + Background Monitor ─────────────────────────
+        // ── License Guard options + Background Monitor + Tamper Detective ──────
         var licenseGuardOptions = configuration
             .GetSection(LicenseGuardOptions.SectionName)
             .Get<LicenseGuardOptions>() ?? new LicenseGuardOptions();
         services.AddSingleton(licenseGuardOptions);
         services.AddHostedService<LicenseExpirationMonitorService>();
+        services.AddHostedService<LicenseTamperMonitorService>();  // Fake License Detective (2h)
 
         // ── Module Discovery — plug-and-play OS kernel ────────────────────────
         // Creates the registry eagerly (before DI build) and calls Discover()

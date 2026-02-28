@@ -46,7 +46,16 @@ public sealed record LicenseStatusDto(
     bool IsExpiringSoon,
 
     /// <summary>UTC timestamp of the last successful remote validation.</summary>
-    DateTimeOffset? LastRemoteValidatedAtUtc);
+    DateTimeOffset? LastRemoteValidatedAtUtc,
+
+    /// <summary>
+    /// Number of tamper-detection strikes recorded (0 = clean).
+    /// Non-zero triggers a warning banner in the frontend.
+    /// </summary>
+    int TamperCount = 0,
+
+    /// <summary>Warning message from the last tamper event. Null when TamperCount is 0.</summary>
+    string? TamperWarningMessage = null);
 
 /// <summary>Machine-readable codes used by the frontend to branch UI logic.</summary>
 public static class LicenseGuardCode
@@ -68,6 +77,12 @@ public static class LicenseGuardCode
 
     /// <summary>Remote check failed; local validation result is used as fallback.</summary>
     public const string RemoteUnreachable = "remote_unreachable";
+
+    /// <summary>Tamper detected (1–2 strikes). License still active; warning surfaced to user.</summary>
+    public const string TamperWarning  = "tamper_warning";
+
+    /// <summary>Account suspended after 3 tamper strikes. No API access until admin review.</summary>
+    public const string AccountSuspended = "account_suspended";
 }
 
 /// <summary>Internal result produced by <see cref="Application.ILicenseGuardService"/>.</summary>
@@ -79,7 +94,11 @@ public sealed record LicenseGuardResult(
     DateOnly? ExpiresOn,
     int? DaysUntilExpiry,
     bool IsExpiringSoon,
-    DateTimeOffset? LastRemoteValidatedAtUtc);
+    DateTimeOffset? LastRemoteValidatedAtUtc,
+    /// <summary>Number of detected tamper strikes. Zero when clean.</summary>
+    int TamperCount = 0,
+    /// <summary>Warning message to surface if TamperCount &gt; 0.</summary>
+    string? TamperWarningMessage = null);
 
 /// <summary>Options for the expiration-warning threshold and background-service interval.</summary>
 public sealed class LicenseGuardOptions
@@ -91,6 +110,11 @@ public sealed class LicenseGuardOptions
 
     /// <summary>How often the background monitor runs, in hours. Default 24 (once per day).</summary>
     public double MonitorIntervalHours { get; set; } = 24;
+
+    /// <summary>
+    /// How often the Fake-License Detective (tamper monitor) runs, in hours. Default 2.
+    /// </summary>
+    public double TamperMonitorIntervalHours { get; set; } = 2;
 
     /// <summary>
     /// Remote license mapping URL.

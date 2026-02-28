@@ -30,7 +30,13 @@ public sealed record LicenseActivationResult(
     /// <summary>License expiry. Null = perpetual.</summary>
     DateOnly? ExpiresOn,
     /// <summary>Applied license ID in the local database, when activated.</summary>
-    Guid? LicenseId);
+    Guid? LicenseId,
+    /// <summary>
+    /// Machine-readable error code for failure cases.
+    /// E.g. "session_expired" when the JWT sub no longer maps to an existing user.
+    /// Null on success.
+    /// </summary>
+    string? ErrorCode = null);
 
 /// <summary>
 /// Snapshot returned by GET /api/v1/owner/businesses/{businessId}/activation-status.

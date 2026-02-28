@@ -115,7 +115,7 @@ public sealed class LicenseActivationService(
         var ownerEmail = await ResolveOwnerEmailAsync(ownerId, ct);
         if (ownerEmail is null)
         {
-            return Fail("Owner user account not found.");
+            return Fail("Your session has expired. Please sign in again.", "session_expired");
         }
 
         // 2. Fetch remote mapping (cached)
@@ -300,6 +300,6 @@ public sealed class LicenseActivationService(
         return existing;
     }
 
-    private static LicenseActivationResult Fail(string message) =>
-        new(false, message, null, null, null, null, null, null, null);
+    private static LicenseActivationResult Fail(string message, string? errorCode = null) =>
+        new(false, message, null, null, null, null, null, null, null, errorCode);
 }

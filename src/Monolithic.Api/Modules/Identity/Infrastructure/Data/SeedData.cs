@@ -28,8 +28,9 @@ public static class SeedData
         logger.LogInformation("[Seed] Database seeding started.");
         logger.LogInformation("[Seed] ══════════════════════════════════════════");
 
-        await context.Database.EnsureCreatedAsync();
-        logger.LogInformation("[Seed] Schema verified / created.");
+        // Schema is managed via EF Core migrations run in Program.cs (MigrateAsync).
+        // EnsureCreatedAsync is intentionally omitted to avoid bypassing the migration history.
+        logger.LogInformation("[Seed] Schema managed by EF migrations (Program.cs).");
 
         // Optional destructive bootstrap reset for local/dev re-install scenarios.
         // Guarded by explicit config + confirmation token to avoid accidental data loss.

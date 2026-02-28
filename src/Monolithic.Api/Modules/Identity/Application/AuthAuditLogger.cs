@@ -22,6 +22,32 @@ public sealed class AuthAuditLogger : IAuthAuditLogger
         _logger = logger;
     }
 
+    public async Task LogSignUpSuccessAsync(
+        Guid userId, string email, CancellationToken ct = default)
+    {
+        var record = Build(AuthAuditEvent.SignUpRegistered, success: true,
+            userId: userId, email: email);
+
+        await PersistAsync(record, ct);
+
+        _logger.LogInformation(
+            "[AUTH] Sign-up succeeded | User={UserId} Email={Email} IP={IpAddress} Agent={UserAgent}",
+            userId, email, record.IpAddress, record.UserAgent);
+    }
+
+    public async Task LogSignUpFailedAsync(
+        string email, string reason, CancellationToken ct = default)
+    {
+        var record = Build(AuthAuditEvent.SignUpFailed, success: false,
+            email: email, failureReason: reason);
+
+        await PersistAsync(record, ct);
+
+        _logger.LogWarning(
+            "[AUTH] Sign-up failed | Email={Email} Reason={Reason} IP={IpAddress} Agent={UserAgent}",
+            email, reason, record.IpAddress, record.UserAgent);
+    }
+
     public async Task LogLoginSuccessAsync(
         Guid userId, string email, Guid? businessId, CancellationToken ct = default)
     {

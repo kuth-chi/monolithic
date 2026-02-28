@@ -48,6 +48,29 @@ public sealed class AuthController : ControllerBase
             : Ok(result);
     }
 
+    // ── POST /api/v1/auth/signup ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Registers a new user account and returns a JWT so the client is
+    /// immediately authenticated — no second login round-trip required.
+    /// Returns 409 Conflict when the email is already in use.
+    /// </summary>
+    [HttpPost("signup")]
+    [EnableRateLimiting(RateLimitingExtensions.AuthPolicy)]
+    [ProducesResponseType(typeof(SignUpResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> SignUp(
+        [FromBody] SignUpRequest request,
+        CancellationToken ct = default)
+    {
+        var result = await _auth.SignUpAsync(request, ct);
+        return result is null
+            ? Conflict(new { message = "An account with this email address already exists." })
+            : StatusCode(StatusCodes.Status201Created, result);
+    }
+
     // ── GET /api/v1/auth/me ───────────────────────────────────────────────────
 
     /// <summary>

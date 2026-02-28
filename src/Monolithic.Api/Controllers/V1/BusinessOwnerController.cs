@@ -14,7 +14,8 @@ namespace Monolithic.Api.Controllers.V1;
 [Route("api/v1/owner")]
 public sealed class BusinessOwnerController(
     IBusinessOwnershipService ownershipService,
-    IBusinessLicenseService licenseService) : ControllerBase
+    IBusinessLicenseService licenseService,
+    ILicenseActivationService activationService) : ControllerBase
 {
     private Guid CurrentUserId =>
         Guid.TryParse(User.FindFirst("sub")?.Value
@@ -75,4 +76,34 @@ public sealed class BusinessOwnerController(
         await ownershipService.RevokeOwnershipAsync(CurrentUserId, businessId, ct);
         return NoContent();
     }
+
+    // ── License Activation ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Validates the (owner-email, businessId) pair against the remote GitHub
+    /// license mapping.  On success, upserts the local BusinessLicense with the
+    /// plan details from the remote file and returns the activation result.
+    ///
+    /// This endpoint is rate-limit-friendly: it caches the remote file for 5 min,
+    /// so repeated calls are safe.
+    /// </summary>
+    [HttpPost("businesses/{businessId:guid}/activate")]
+    [RequirePermission("owner:write")]
+    public async Task<IActionResult> ActivateLicense(Guid businessId, CancellationToken ct)
+    {
+        var result = await activationService.ActivateAsync(CurrentUserId, businessId, ct);
+        if (!result.IsActivated)
+            return UnprocessableEntity(result);   // 422 — business rule failure (not a client error)
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Returns the current activation / license status for a specific business
+    /// without triggering a re-sync.  Safe to poll from the front-end.
+    /// </summary>
+    [HttpGet("businesses/{businessId:guid}/activation-status")]
+    [RequirePermission("owner:read")]
+    public async Task<IActionResult> GetActivationStatus(Guid businessId, CancellationToken ct)
+        => Ok(await activationService.GetStatusAsync(CurrentUserId, businessId, ct));
 }

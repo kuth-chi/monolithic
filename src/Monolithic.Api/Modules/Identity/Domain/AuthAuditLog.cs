@@ -3,10 +3,12 @@ namespace Monolithic.Api.Modules.Identity.Domain;
 /// <summary>Events captured by the authentication audit logger.</summary>
 public enum AuthAuditEvent
 {
-    LoginSuccess   = 1,
-    LoginFailed    = 2,
+    LoginSuccess     = 1,
+    LoginFailed      = 2,
     BusinessSwitched = 3,
-    Logout         = 4
+    Logout           = 4,
+    SignUpRegistered = 5,
+    SignUpFailed     = 6
 }
 
 /// <summary>

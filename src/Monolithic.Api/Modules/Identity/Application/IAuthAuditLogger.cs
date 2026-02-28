@@ -8,6 +8,10 @@ namespace Monolithic.Api.Modules.Identity.Application;
 /// </summary>
 public interface IAuthAuditLogger
 {
+    Task LogSignUpSuccessAsync(Guid userId, string email, CancellationToken ct = default);
+
+    Task LogSignUpFailedAsync(string email, string reason, CancellationToken ct = default);
+
     Task LogLoginSuccessAsync(Guid userId, string email, Guid? businessId, CancellationToken ct = default);
 
     Task LogLoginFailedAsync(string email, string reason, CancellationToken ct = default);

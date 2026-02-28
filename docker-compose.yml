@@ -31,6 +31,9 @@ services:
       # Cors__AllowedOrigins__0: ${FRONTEND_URL}
     volumes:
       - dp_keys:/root/.aspnet/DataProtection-Keys
+      # Docker socket mount — required for the System Update feature.
+      # Allows the API to query the local Docker Engine and trigger image pulls/restarts.
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy

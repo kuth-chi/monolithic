@@ -57,6 +57,7 @@ public sealed class PlatformModule : ModuleBase
         yield return Nav("feature-flags", "Feature Flags",      "/admin/platform/feature-flags",     UiContext.Admin, icon: "beaker",               order: 9,  parentKey: "platform.admin-root", requiredPermissions: ["platform:feature-flags:write"]);
         yield return Nav("notifications", "Notifications",      "/admin/platform/notifications",     UiContext.Admin, icon: "bell",                 order: 10, parentKey: "platform.admin-root", requiredPermissions: ["platform:notifications:write"]);
         yield return Nav("preferences",   "User Preferences",   "/admin/platform/user-preferences",  UiContext.Admin, icon: "adjustments-horizontal",order: 11, parentKey: "platform.admin-root", requiredPermissions: ["platform:preferences:read"]);
+        yield return Nav("system-update",  "System Update",      "/admin/platform/system-update",     UiContext.Admin, icon: "arrow-path",              order: 12, parentKey: "platform.admin-root", requiredPermissions: ["platform:docker:update"]);
 
         // ── Operation UI — notifications visible to all users ─────────────────
         yield return Nav("notif-op",   "Notifications",         "/notifications",                    UiContext.Operation, icon: "bell", order: 998);
@@ -76,5 +77,6 @@ public sealed class PlatformModule : ModuleBase
         yield return Perm("notifications", "write", "Manage Notification Settings", defaultRoles: ["admin"], isSensitive: true);
         yield return Perm("preferences",   "read",  "View User Preferences",        defaultRoles: ["admin", "manager"]);
         yield return Perm("info",          "read",  "View Platform Info / Manifest",defaultRoles: ["admin", "manager"]);
+        yield return Perm("docker",        "update","Trigger Docker Image Updates",  defaultRoles: ["admin"], isSensitive: true);
     }
 }

@@ -20,6 +20,7 @@ namespace Monolithic.Api.Common.Security;
 ///
 /// Bypassed routes (no license check):
 ///   • /api/v1/auth/**           — login, signup, me
+///   • /api/v1/platform/**       — app-context, navigation, modules (JWT-only; needed pre-license)
 ///   • /api/v1/owner/**/activate — license activation endpoints
 ///   • /api/v1/license/**        — status polling (allows unauthenticated check)
 ///   • /healthz                  — Kubernetes probes
@@ -39,6 +40,7 @@ public sealed class LicenseValidationMiddleware(
     private static readonly string[] BypassPrefixes =
     [
         "/api/v1/auth/",
+        "/api/v1/platform/",     // app-context, navigation, modules — JWT-only metadata; needed before any license exists
         "/api/v1/owner/",        // activation endpoint lives here; see logic below
         "/api/v1/license/",
         "/healthz",

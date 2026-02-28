@@ -1,0 +1,80 @@
+name: CI — Build & Test
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CONTINUOUS INTEGRATION
+# ──────────────────────
+# Runs on every push (or merged PR) into the main or dev branches.
+# Purpose: fast feedback — verify the build compiles and all tests pass.
+#
+# WHAT THIS DOES NOT DO
+# ─────────────────────
+# • No Docker image build or push — that belongs to the release pipeline.
+# • No tag validation — tags are handled by release.yml.
+#
+# TRIGGER SCOPE
+# ─────────────
+#   push → main   e.g. PR merged into main  (production integration check)
+#   push → dev    e.g. feature branch merged into dev  (daily integration)
+#
+# JOB PIPELINE
+# ────────────
+#   build-and-test
+#     └─ checkout → setup .NET → restore → build → test
+# ─────────────────────────────────────────────────────────────────────────────
+on:
+  push:
+    branches:
+      - main
+      - dev
+
+# Least-privilege: only read repo contents.
+permissions:
+  contents: read
+
+# Cancel a previous in-progress CI run for the same branch when a new commit arrives.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_VERSION: "10.0.x"
+
+# ─────────────────────────────────────────────────────────────────────────────
+jobs:
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # JOB — Build the .NET solution and run the full test suite
+  # ───────────────────────────────────────────────────────────────────────────
+  build-and-test:
+    name: Build & Test (.NET ${{ env.DOTNET_VERSION }})
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup .NET ${{ env.DOTNET_VERSION }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore NuGet packages
+        run: dotnet restore Monolithic.slnx
+
+      - name: Build — Release configuration
+        run: dotnet build Monolithic.slnx --configuration Release --no-restore
+
+      - name: Run test suite
+        run: dotnet test Monolithic.slnx --configuration Release --no-build --verbosity normal
+
+      - name: Job summary
+        if: always()
+        run: |
+          echo "## CI Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field    | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch   | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit   | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Actor    | \`${{ github.actor }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Trigger  | \`${{ github.event_name }}\` |" >> $GITHUB_STEP_SUMMARY

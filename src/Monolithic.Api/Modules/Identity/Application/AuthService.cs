@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Monolithic.Api.Common.Caching;
 using Monolithic.Api.Common.Configuration;
 using Monolithic.Api.Modules.Identity.Contracts;
 using Monolithic.Api.Modules.Identity.Domain;
@@ -19,17 +20,20 @@ public sealed class AuthService : IAuthService
     private readonly ApplicationDbContext _db;
     private readonly JwtOptions _jwt;
     private readonly IAuthAuditLogger _audit;
+    private readonly ITwoLevelCache _cache;
 
     public AuthService(
         UserManager<ApplicationUser> userManager,
         ApplicationDbContext db,
         IOptions<JwtOptions> jwtOptions,
-        IAuthAuditLogger audit)
+        IAuthAuditLogger audit,
+        ITwoLevelCache cache)
     {
         _userManager = userManager;
         _db = db;
         _jwt = jwtOptions.Value;
         _audit = audit;
+        _cache = cache;
     }
 
     // ── Public API ────────────────────────────────────────────────────────────
@@ -319,4 +323,33 @@ public sealed class AuthService : IAuthService
 
     private static UserBusinessSummary ToSummary(UserBusiness ub) =>
         new(ub.BusinessId, ub.Business.Name, ub.Business.Code, ub.IsDefault, ub.IsActive);
+
+    // ── System init probe ────────────────────────────────────────────────────
+
+    /// <inheritdoc />
+    public async Task<SystemInitResponse> HasAnyUserAsync(
+        CancellationToken cancellationToken = default)
+    {
+        // Wrapper class required by ITwoLevelCache<T> where T : class constraint.
+        var cached = await _cache.GetOrCreateAsync(
+            key:     CacheKeys.SystemHasUsers,
+            factory: async ct =>
+            {
+                // Single-column EXISTS projection — avoids loading any entity graph.
+                // AnyAsync() translates to `SELECT 1 FROM ... LIMIT 1` in EF Core.
+                var exists = await _db.Users
+                    .AsNoTracking()
+                    .AnyAsync(ct);
+
+                return new SystemInitBox(exists);
+            },
+            l2Ttl: TimeSpan.FromMinutes(5),
+            l1Ttl: TimeSpan.FromSeconds(30),
+            cancellationToken);
+
+        return new SystemInitResponse(cached.HasUsers);
+    }
+
+    /// <summary>Cache-wrapper — required because <see cref="ITwoLevelCache"/> constrains T to class.</summary>
+    private sealed record SystemInitBox(bool HasUsers);
 }

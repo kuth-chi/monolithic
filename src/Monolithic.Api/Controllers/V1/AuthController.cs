@@ -26,6 +26,30 @@ public sealed class AuthController : ControllerBase
         _audit = audit;
     }
 
+    // ── GET /api/v1/auth/has-users ────────────────────────────────────────────
+
+    /// <summary>
+    /// Anonymous system-initialisation probe.
+    /// Returns <c>{ "hasUsers": false }</c> when the database contains no user accounts,
+    /// allowing the frontend to redirect a brand-new installation straight to /signup
+    /// instead of showing the /login page with no valid credentials.
+    ///
+    /// Security notes:
+    ///   • Returns only a boolean — no user data is disclosed.
+    ///   • Rate-limited by the fixed policy to prevent enumeration timing analysis.
+    ///   • Result is cached (L1 30 s / L2 5 min) — no per-request DB hit in production.
+    /// </summary>
+    [HttpGet("has-users")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitingExtensions.FixedPolicy)]
+    [ProducesResponseType(typeof(SystemInitResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> HasUsers(CancellationToken ct = default)
+    {
+        var result = await _auth.HasAnyUserAsync(ct);
+        return Ok(result);
+    }
+
     // ── POST /api/v1/auth/login ───────────────────────────────────────────────
 
     /// <summary>

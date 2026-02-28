@@ -43,17 +43,25 @@ public static class SeedData
         logger.LogInformation("[Seed] Step 2/6 — Roles");
         var (ownerRole, systemAdminRole, staffRole, userRole) = await SeedRolesAsync(roleManager, context, permissions, logger);
 
-        // ── Step 3: Demo users ────────────────────────────────────────────────
-        logger.LogInformation("[Seed] Step 3/6 — Demo users");
-        await SeedUsersAsync(userManager, ownerRole, systemAdminRole, staffRole, userRole, logger);
+        // ── Step 3-5: Demo data (guard by Seed:DemoData:Enabled) ─────────────
+        var demoDataEnabled = configuration.GetValue("Seed:DemoData:Enabled", false);
+        if (demoDataEnabled)
+        {
+            logger.LogInformation("[Seed] Step 3/6 — Demo users  (DemoData:Enabled=true)");
+            await SeedUsersAsync(userManager, ownerRole, systemAdminRole, staffRole, userRole, logger);
 
-        // ── Step 4: Demo businesses + memberships ─────────────────────────────
-        logger.LogInformation("[Seed] Step 4/6 — Demo businesses & memberships");
-        await SeedBusinessesAndMembershipsAsync(context, userManager, logger);
+            logger.LogInformation("[Seed] Step 4/6 — Demo businesses & memberships");
+            await SeedBusinessesAndMembershipsAsync(context, userManager, logger);
 
-        // ── Step 5: Owner license + ownership records ─────────────────────────
-        logger.LogInformation("[Seed] Step 5/6 — Owner license & ownership");
-        await SeedOwnershipAndLicenseAsync(context, userManager, logger);
+            logger.LogInformation("[Seed] Step 5/6 — Owner license & ownership");
+            await SeedOwnershipAndLicenseAsync(context, userManager, logger);
+        }
+        else
+        {
+            logger.LogInformation(
+                "[Seed] Steps 3-5 skipped — Seed:DemoData:Enabled is false. " +
+                "Set to true in appsettings.Development.json to seed demo users.");
+        }
 
         // ── Step 6: File / remote license mapping ─────────────────────────────
         logger.LogInformation("[Seed] Step 6/6 — License mapping (file / remote)");

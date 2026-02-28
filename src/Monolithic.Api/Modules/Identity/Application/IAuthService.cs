@@ -38,4 +38,11 @@ public interface IAuthService
     /// Returns <c>null</c> when the user no longer exists.
     /// </summary>
     Task<MeResponse?> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns <c>true</c> when at least one <see cref="ApplicationUser"/> row exists in the database.
+    /// This anonymous probe lets the frontend redirect a brand-new installation to /signup
+    /// instead of /login.  Result is cached (L1 30 s / L2 5 min) to avoid per-request DB probes.
+    /// </summary>
+    Task<SystemInitResponse> HasAnyUserAsync(CancellationToken cancellationToken = default);
 }

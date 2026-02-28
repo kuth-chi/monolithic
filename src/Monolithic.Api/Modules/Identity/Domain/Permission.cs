@@ -18,6 +18,17 @@ public sealed class Permission
 
     public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
 
+    /// <summary>
+    /// When <c>true</c> this permission uses the <c>self</c> action convention
+    /// (<c>{module}:{resource}:self</c>) and is evaluated via the
+    /// <c>SelfOwnershipAuthorizationHandler</c> resource-based authorization pipeline
+    /// rather than a simple claim presence check.
+    ///
+    /// Assigning this permission to a role means role members may access their
+    /// OWN records; not other users' records.
+    /// </summary>
+    public bool IsSelfScoped { get; set; } = false;
+
     // navigation
     public ICollection<RolePermission> RolePermissions { get; set; } = [];
 

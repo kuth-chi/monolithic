@@ -1,10 +1,22 @@
 {
-  "users": [
+  "licenses": [
     {
       "email": "owner.enterprise@your-domain.local",
       "fullName": "Enterprise Owner",
-      "roles": ["Owner"],
-      "businessNames": ["ABC Group", "XYZ Tech"],
+      "contacts": [
+        {
+          "name": "Enterprise Owner",
+          "title": "owner",
+          "contact": [
+            { "kind": "phone",    "key": "+1 555 000 0001" },
+            { "kind": "facebook", "key": "fb.me/enterprise-owner" }
+          ]
+        }
+      ],
+      "businessIds": [
+        "REPLACE-WITH-BUSINESS-ID-FROM-DB-00001",
+        "REPLACE-WITH-BUSINESS-ID-FROM-DB-00002"
+      ],
       "license": {
         "licenseKey": "LIC-ENT-CHANGE-ME-001",
         "plan": "Enterprise",
@@ -22,8 +34,18 @@
     {
       "email": "owner.pro@your-domain.local",
       "fullName": "Professional Owner",
-      "roles": ["Owner"],
-      "businessNames": ["ABC Group"],
+      "contacts": [
+        {
+          "name": "Professional Owner",
+          "title": "owner",
+          "contact": [
+            { "kind": "phone", "key": "+1 555 000 0002" }
+          ]
+        }
+      ],
+      "businessIds": [
+        "REPLACE-WITH-BUSINESS-ID-FROM-DB-00003"
+      ],
       "license": {
         "licenseKey": "LIC-PRO-CHANGE-ME-002",
         "plan": "Professional",
@@ -41,8 +63,18 @@
     {
       "email": "owner.starter@your-domain.local",
       "fullName": "Starter Owner",
-      "roles": ["Owner"],
-      "businessNames": ["XYZ Tech"],
+      "contacts": [
+        {
+          "name": "Starter Owner",
+          "title": "owner",
+          "contact": [
+            { "kind": "phone", "key": "+1 555 000 0003" }
+          ]
+        }
+      ],
+      "businessIds": [
+        "REPLACE-WITH-BUSINESS-ID-FROM-DB-00004"
+      ],
       "license": {
         "licenseKey": "LIC-STARTER-CHANGE-ME-003",
         "plan": "Starter",

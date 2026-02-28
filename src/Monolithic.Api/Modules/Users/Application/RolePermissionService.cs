@@ -163,6 +163,88 @@ public sealed class RolePermissionService(
             IsAssigned: false);
     }
 
+    public async Task<Result<RoleSummaryDto>> CreateRoleAsync(
+        CreateRoleRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var name = request.Name.Trim();
+
+        if (string.IsNullOrWhiteSpace(name))
+            return Error.Validation("Role.NameRequired", "Role name is required.");
+
+        // Block names that collide with any system-protected constant
+        if (SystemRoleNames.IsProtected(name))
+            return Error.Forbidden("Role.SystemRole.Reserved",
+                $"'{name}' is a reserved system role name and cannot be used.");
+
+        var exists = await roleManager.Roles
+            .AnyAsync(r => r.Name == name, cancellationToken);
+
+        if (exists)
+            return Error.Conflict("Role.Duplicate", $"A role named '{name}' already exists.");
+
+        var role = new ApplicationRole
+        {
+            Id          = Guid.NewGuid(),
+            Name        = name,
+            Description = request.Description.Trim(),
+            IsSystemRole = false,   // user-created roles are never system-protected
+        };
+
+        var result = await roleManager.CreateAsync(role);
+        if (!result.Succeeded)
+        {
+            var errors = string.Join("; ", result.Errors.Select(e => e.Description));
+            return Error.Validation("Role.CreateFailed", errors);
+        }
+
+        return new RoleSummaryDto(role.Id, role.Name!, role.Description, role.IsSystemRole);
+    }
+
+    public async Task<Result> DeleteRoleAsync(
+        Guid roleId,
+        CancellationToken cancellationToken = default)
+    {
+        var role = await roleManager.Roles
+            .FirstOrDefaultAsync(r => r.Id == roleId, cancellationToken);
+
+        if (role is null)
+            return Error.NotFound("Role.NotFound", $"Role '{roleId}' was not found.");
+
+        // Hard guard — system-seeded roles can never be deleted
+        if (role.IsSystemRole || SystemRoleNames.IsProtected(role.Name))
+            return Error.Forbidden("Role.SystemRole.Protected",
+                $"'{role.Name}' is a system role and cannot be deleted.");
+
+        // Verify no users are currently assigned to this role before removing it
+        var assignedUsers = await dbContext.UserRoles
+            .AsNoTracking()
+            .AnyAsync(ur => ur.RoleId == roleId, cancellationToken);
+
+        if (assignedUsers)
+            return Error.Conflict("Role.HasMembers",
+                "Cannot delete a role that still has users assigned to it. Remove all users from this role first.");
+
+        // Remove all permission assignments first (FK constraint)
+        var rolePerms = await dbContext.RolePermissions
+            .Where(rp => rp.RoleId == roleId)
+            .ToListAsync(cancellationToken);
+
+        if (rolePerms.Count > 0)
+            dbContext.RolePermissions.RemoveRange(rolePerms);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var deleteResult = await roleManager.DeleteAsync(role);
+        if (!deleteResult.Succeeded)
+        {
+            var errors = string.Join("; ", deleteResult.Errors.Select(e => e.Description));
+            return Error.Validation("Role.DeleteFailed", errors);
+        }
+
+        return Result.Ok;
+    }
+
     private async Task<RoleEditPermissionsDto> BuildRoleEditDtoAsync(
         ApplicationRole role,
         CancellationToken cancellationToken)

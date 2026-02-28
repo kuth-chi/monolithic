@@ -42,6 +42,13 @@ public sealed record CreatePermissionRequest(
     string? Permission,
     string Description);
 
+/// <summary>Payload for POST /api/v1/users/roles.</summary>
+public sealed record CreateRoleRequest(
+    /// <summary>Display name of the new role. Must be unique.</summary>
+    string Name,
+    /// <summary>Human-readable description shown in the role management UI.</summary>
+    string Description);
+
 public sealed record RoleListQueryParameters : QueryParameters
 {
     /// <summary>

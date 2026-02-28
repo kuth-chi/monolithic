@@ -92,6 +92,14 @@ public sealed class AuthService : IAuthService
             return null;
         }
 
+        // ── First-user-as-Owner rule ────────────────────────────────────────
+        // On a fresh Docker install there are no application users yet.
+        // The very first account to sign up is automatically granted the
+        // Owner role so they can complete the business creation wizard
+        // immediately after signup without any manual role assignment.
+        // Subsequent signups receive the baseline "User" role.
+        var isFirstUser = !await _userManager.Users.AnyAsync(cancellationToken);
+
         var user = new ApplicationUser
         {
             UserName = request.Email,
@@ -108,8 +116,9 @@ public sealed class AuthService : IAuthService
             throw new InvalidOperationException($"User creation failed: {errors}");
         }
 
-        // Assign default "User" role
-        await _userManager.AddToRoleAsync(user, "User");
+        // Assign Owner to the first user; all subsequent accounts start as User.
+        var defaultRole = isFirstUser ? SystemRoleNames.Owner : "User";
+        await _userManager.AddToRoleAsync(user, defaultRole);
 
         // New user has no business memberships yet
         var (roles, permissions) = await LoadRolesAndPermissionsAsync(user.Id, cancellationToken);

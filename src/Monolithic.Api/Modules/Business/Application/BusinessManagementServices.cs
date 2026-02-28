@@ -5,6 +5,7 @@ using Monolithic.Api.Common.Pagination;
 using Monolithic.Api.Common.Storage;
 using Monolithic.Api.Modules.Business.Contracts;
 using Monolithic.Api.Modules.Business.Domain;
+using Monolithic.Api.Modules.Identity.Domain;
 using Monolithic.Api.Modules.Identity.Infrastructure.Data;
 
 namespace Monolithic.Api.Modules.Business.Application;
@@ -257,9 +258,26 @@ public sealed class BusinessOwnershipService(
         };
         db.BusinessOwnerships.Add(ownership);
 
+        // 5. Create UserBusiness membership for the owner so the JWT
+        //    gains a business_id claim immediately after creation.
+        //    IsDefault=true when the owner has no other default business yet.
+        var hasDefaultBusiness = await db.UserBusinesses
+            .AnyAsync(ub => ub.UserId == ownerId && ub.IsDefault, ct);
+
+        var userBusiness = new UserBusiness
+        {
+            Id = Guid.NewGuid(),
+            UserId = ownerId,
+            BusinessId = business.Id,
+            IsDefault = !hasDefaultBusiness,
+            IsActive = true,
+            JoinedAtUtc = DateTimeOffset.UtcNow
+        };
+        db.UserBusinesses.Add(userBusiness);
+
         await db.SaveChangesAsync(ct);
 
-        // 5. Seed standard chart of accounts (after save so BusinessId FK is valid)
+        // 6. Seed standard chart of accounts (after save so BusinessId FK is valid)
         await coaService.SeedStandardCOAAsync(business.Id, req.BaseCurrencyCode, ct);
 
         return new BusinessOwnershipDto(

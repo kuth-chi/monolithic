@@ -65,6 +65,50 @@ public sealed class RolePermissionsController(
         return result.ToActionResult(this);
     }
 
+    /// <summary>Creates a new non-system role.</summary>
+    [HttpPost]
+    [RequirePermission("users:roles:admin")]
+    [ProducesResponseType(typeof(RoleSummaryDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CreateRole(
+        [FromBody] CreateRoleRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsSystemAdminUser())
+            return Forbid();
+
+        var result = await rolePermissionService.CreateRoleAsync(request, cancellationToken);
+        if (!result.IsSuccess)
+            return result.ToActionResult(this);
+
+        var created = result.Value!;
+        return CreatedAtAction(nameof(GetRoleForEdit), new { roleId = created.RoleId }, created);
+    }
+
+    /// <summary>
+    /// Deletes a role permanently.
+    /// Returns 403 when the target role is a system-seeded role (Owner, System Admin, Staff, User).
+    /// Returns 409 when users are still assigned to the role.
+    /// </summary>
+    [HttpDelete("{roleId:guid}")]
+    [RequirePermission("users:roles:admin")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> DeleteRole(
+        Guid roleId,
+        CancellationToken cancellationToken)
+    {
+        if (!IsSystemAdminUser())
+            return Forbid();
+
+        var result = await rolePermissionService.DeleteRoleAsync(roleId, cancellationToken);
+        return result.ToNoContentResult(this);
+    }
+
     [HttpPost("permissions")]
     [RequirePermission("users:roles:admin")]
     [ProducesResponseType(typeof(PermissionActionItemDto), StatusCodes.Status200OK)]

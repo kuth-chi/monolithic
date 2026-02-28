@@ -3224,6 +3224,10 @@ namespace Monolithic.Api.Migrations
                         .HasColumnType("TEXT")
                         .HasDefaultValue("");
 
+                    b.Property<bool>("IsSelfScoped")
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false);
+
                     b.HasKey("Id");
 
                     b.HasIndex("Name")

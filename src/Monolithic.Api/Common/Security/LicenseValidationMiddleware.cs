@@ -46,11 +46,16 @@ public sealed class LicenseValidationMiddleware(
         "/openapi",
     ];
 
-    // Within /api/v1/owner/ we DO enforce the license — except for activate & activation-status
+    // Within /api/v1/owner/ we DO enforce the license — except for:
+    //   • /activate             — license activation requires the business to exist first
+    //   • /activation-status    — read-only status polling
+    //   • /businesses           — first-business creation predates any license;
+    //                             the service layer performs its own quota guard
     private static readonly string[] OwnerActivationSuffixes =
     [
         "/activate",
         "/activation-status",
+        "/businesses",
     ];
 
     public async Task InvokeAsync(HttpContext context)

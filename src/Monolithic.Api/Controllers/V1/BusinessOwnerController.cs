@@ -62,9 +62,9 @@ public sealed class BusinessOwnerController(
     [RequirePermission("owner:write")]
     public async Task<IActionResult> CreateBusiness([FromBody] CreateBusinessWithOwnerRequest request, CancellationToken ct)
     {
-        if (!await licenseService.CanCreateBusinessAsync(CurrentUserId, ct))
-            return StatusCode(403, "License quota exceeded: cannot create more businesses.");
-
+        // License quota and expiry are enforced inside CreateBusinessAsync.
+        // LicenseException (402) and DomainException (422) bubble up through
+        // GlobalExceptionHandler — no duplicate check needed here.
         var result = await ownershipService.CreateBusinessAsync(CurrentUserId, request, ct);
         return CreatedAtAction(nameof(GetOwnedBusinesses), result);
     }

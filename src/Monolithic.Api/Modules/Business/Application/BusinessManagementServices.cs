@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Monolithic.Api.Common.Caching;
+using Monolithic.Api.Common.Errors;
 using Monolithic.Api.Common.Pagination;
 using Monolithic.Api.Common.Storage;
 using Monolithic.Api.Modules.Business.Contracts;
@@ -111,11 +112,17 @@ public sealed class BusinessLicenseService(ApplicationDbContext db) : IBusinessL
             .Where(l => l.OwnerId == ownerId && l.Status == LicenseStatus.Active)
             .FirstOrDefaultAsync(ct);
 
-        if (license is null) return false;
-        if (license.ExpiresOn.HasValue && license.ExpiresOn.Value < DateOnly.FromDateTime(DateTime.UtcNow)) return false;
-
         var currentCount = await db.BusinessOwnerships
             .CountAsync(o => o.OwnerId == ownerId && o.RevokedAtUtc == null, ct);
+
+        // No active license: allow only if this is truly the first business.
+        // CreateBusinessAsync will auto-provision a Free-plan license in that path.
+        if (license is null)
+            return currentCount == 0;
+
+        // Expired license — cannot create until renewed.
+        if (license.ExpiresOn.HasValue && license.ExpiresOn.Value < DateOnly.FromDateTime(DateTime.UtcNow))
+            return false;
 
         return currentCount < license.MaxBusinesses;
     }
@@ -195,11 +202,47 @@ public sealed class BusinessOwnershipService(
         CreateBusinessWithOwnerRequest req,
         CancellationToken ct = default)
     {
-        if (!await licenseService.CanCreateBusinessAsync(ownerId, ct))
-            throw new InvalidOperationException("License quota exceeded: cannot create more businesses.");
-
+        // ── Pre-flight license guard ───────────────────────────────────────────
         var license = await db.BusinessLicenses
-            .FirstAsync(l => l.OwnerId == ownerId && l.Status == LicenseStatus.Active, ct);
+            .FirstOrDefaultAsync(l => l.OwnerId == ownerId && l.Status == LicenseStatus.Active, ct);
+
+        if (license is null)
+        {
+            // New owner: verify they have zero existing businesses before auto-provisioning.
+            var existingCount = await db.BusinessOwnerships
+                .CountAsync(o => o.OwnerId == ownerId && o.RevokedAtUtc == null, ct);
+
+            if (existingCount > 0)
+                throw LicenseException.QuotaExceeded("businesses"); // should not normally reach here
+
+            // Auto-provision Free-plan license for first-time owners.
+            // The entire unit-of-work (license + business + branch + …) saves atomically below.
+            license = new BusinessLicense
+            {
+                Id       = Guid.NewGuid(),
+                OwnerId  = ownerId,
+                Plan     = LicensePlan.Free,
+                Status   = LicenseStatus.Active,
+                MaxBusinesses          = 1,
+                MaxBranchesPerBusiness = 3,
+                MaxEmployees           = 10,
+                StartsOn = DateOnly.FromDateTime(DateTime.UtcNow),
+            };
+            db.BusinessLicenses.Add(license);
+        }
+        else
+        {
+            // Active license exists — enforce expiry and quota.
+            if (license.ExpiresOn.HasValue
+                && license.ExpiresOn.Value < DateOnly.FromDateTime(DateTime.UtcNow))
+                throw LicenseException.Expired(license.ExpiresOn.Value);
+
+            var current = await db.BusinessOwnerships
+                .CountAsync(o => o.OwnerId == ownerId && o.RevokedAtUtc == null, ct);
+
+            if (current >= license.MaxBusinesses)
+                throw LicenseException.QuotaExceeded("businesses");
+        }
 
         // 1. Create business
         var business = new Domain.Business

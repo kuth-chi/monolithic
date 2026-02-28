@@ -46,7 +46,7 @@ jobs:
   # JOB — Build the .NET solution and run the full test suite
   # ───────────────────────────────────────────────────────────────────────────
   build-and-test:
-    name: Build & Test (.NET ${{ env.DOTNET_VERSION }})
+    name: Build & Test (.NET 10.0.x)
     runs-on: ubuntu-latest
 
     steps:

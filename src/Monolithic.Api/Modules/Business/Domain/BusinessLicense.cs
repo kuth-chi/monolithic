@@ -68,6 +68,25 @@ public class BusinessLicense
     /// </summary>
     public bool ExpirationWarningIssued { get; set; }
 
+    // ── Tamper Detection (Fake License Detective) ─────────────────────────────
+
+    /// <summary>
+    /// Cumulative count of detected tampering events (hash mismatch / remote
+    /// revocation attempts).  Three strikes trigger account suspension.
+    /// </summary>
+    public int TamperCount { get; set; }
+
+    /// <summary>
+    /// UTC timestamp of the most recent tamper-detection event. Null = none.
+    /// </summary>
+    public DateTimeOffset? LastTamperDetectedAtUtc { get; set; }
+
+    /// <summary>
+    /// Human-readable warning message set by tamper detection; surfaced to
+    /// the frontend as a banner when TamperCount &gt; 0.
+    /// </summary>
+    public string? TamperWarningMessage { get; set; }
+
     // ── Navigation ────────────────────────────────────────────────────────────
 
     /// <summary>All businesses belonging to this owner.</summary>

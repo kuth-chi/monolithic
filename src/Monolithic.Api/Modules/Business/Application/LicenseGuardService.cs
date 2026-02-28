@@ -94,7 +94,7 @@ public sealed class LicenseGuardService(
             return NoLicenseResult();
         }
 
-        // 2. Verify hash integrity
+        // 2. Verify hash integrity — increments strike counter instead of immediate revoke
         if (!string.IsNullOrWhiteSpace(license.ExternalSubscriptionId))
         {
             var expectedHash = ComputeHash(license.ExternalSubscriptionId, ownerId, license.StartsOn);
@@ -102,9 +102,8 @@ public sealed class LicenseGuardService(
                 !string.Equals(license.ValidationHash, expectedHash, StringComparison.OrdinalIgnoreCase))
             {
                 logger.LogWarning(
-                    "[LicenseGuard] Hash mismatch for owner {OwnerId}. Revoking license.", ownerId);
-                await RevokeLicenseAsync(license, "Hash mismatch — tamper detected.", ct);
-                return RevokedResult("License integrity check failed. Please re-activate.");
+                    "[LicenseGuard] Hash mismatch for owner {OwnerId}. Strike {Count}.", ownerId, license.TamperCount + 1);
+                return await RecordTamperStrikeAsync(license, ownerId, "Hash mismatch — potential database tampering.", ct);
             }
         }
 
@@ -233,6 +232,71 @@ public sealed class LicenseGuardService(
         logger.LogInformation("[LicenseGuard] License {Id} removed. Reason: {Reason}", license.Id, reason);
     }
 
+    /// <summary>
+    /// Increments the tamper-strike counter. On the 3rd strike the license is
+    /// hard-deleted and the owner account is suspended (IsActive = false).
+    /// Returns the corresponding <see cref="LicenseGuardResult"/>.
+    /// </summary>
+    private async Task<LicenseGuardResult> RecordTamperStrikeAsync(
+        BusinessLicense license, Guid ownerId, string reason, CancellationToken ct)
+    {
+        const int maxStrikes = 3;
+
+        license.TamperCount++;
+        license.LastTamperDetectedAtUtc = DateTimeOffset.UtcNow;
+        license.TamperWarningMessage    = reason;
+        license.ModifiedAtUtc           = DateTimeOffset.UtcNow;
+
+        if (license.TamperCount >= maxStrikes)
+        {
+            logger.LogWarning(
+                "[LicenseGuard] Owner {OwnerId} reached {Strikes} tamper strikes. Suspending account.",
+                ownerId, license.TamperCount);
+
+            await SuspendAccountAsync(ownerId,
+                $"Account suspended after {maxStrikes} license-tampering events. Contact support.", ct);
+
+            // Hard-delete license after account suspended
+            await RevokeLicenseAsync(license, $"3-strike suspension. {reason}", ct);
+
+            return SuspendedResult(
+                "Your account has been suspended due to repeated license integrity violations. Contact support.");
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        int remaining = maxStrikes - license.TamperCount;
+        var warning   = $"License integrity warning ({license.TamperCount}/{maxStrikes}): {reason} " +
+                        $"{remaining} warning(s) remaining before account suspension.";
+
+        logger.LogWarning("[LicenseGuard] Tamper warning for owner {OwnerId}: {Warning}", ownerId, warning);
+
+        return BuildLocalResult(license, options) with
+        {
+            Code               = LicenseGuardCode.TamperWarning,
+            Message            = warning,
+            TamperCount        = license.TamperCount,
+            TamperWarningMessage = warning,
+        };
+    }
+
+    /// <summary>
+    /// Sets <c>IsActive = false</c> on the owner's <see cref="ApplicationUser"/> row.
+    /// </summary>
+    private async Task SuspendAccountAsync(Guid ownerId, string reason, CancellationToken ct)
+    {
+        var user = await db.Users.FindAsync([ownerId], ct);
+        if (user is null) return;
+
+        user.IsActive         = false;
+        user.SuspendedAtUtc   = DateTimeOffset.UtcNow;
+        user.SuspendedReason  = reason;
+        await db.SaveChangesAsync(ct);
+
+        logger.LogInformation(
+            "[LicenseGuard] Account {OwnerId} suspended. Reason: {Reason}", ownerId, reason);
+    }
+
     // ── Static builders ───────────────────────────────────────────────────────
 
     internal static LicenseGuardResult BuildLocalResult(
@@ -264,21 +328,27 @@ public sealed class LicenseGuardService(
                     ExpiresOn:                 license.ExpiresOn,
                     DaysUntilExpiry:           days,
                     IsExpiringSoon:            true,
-                    LastRemoteValidatedAtUtc:  license.LastRemoteValidatedAtUtc);
+                    LastRemoteValidatedAtUtc:  license.LastRemoteValidatedAtUtc,
+                    TamperCount:               license.TamperCount,
+                    TamperWarningMessage:      license.TamperWarningMessage);
             }
         }
 
         return new LicenseGuardResult(
             IsValid:                  true,
-            Code:                     LicenseGuardCode.Valid,
-            Message:                  "License is valid.",
+            Code:                     license.TamperCount > 0 ? LicenseGuardCode.TamperWarning : LicenseGuardCode.Valid,
+            Message:                  license.TamperCount > 0
+                                        ? license.TamperWarningMessage ?? "License integrity warning detected."
+                                        : "License is valid.",
             Plan:                     license.Plan,
             ExpiresOn:                license.ExpiresOn,
             DaysUntilExpiry:          license.ExpiresOn.HasValue
                                         ? license.ExpiresOn.Value.DayNumber - today.DayNumber
                                         : null,
             IsExpiringSoon:           false,
-            LastRemoteValidatedAtUtc: license.LastRemoteValidatedAtUtc);
+            LastRemoteValidatedAtUtc: license.LastRemoteValidatedAtUtc,
+            TamperCount:              license.TamperCount,
+            TamperWarningMessage:     license.TamperWarningMessage);
     }
 
     private static LicenseGuardResult NoLicenseResult() => new(
@@ -308,6 +378,16 @@ public sealed class LicenseGuardService(
         Plan:                     null,
         ExpiresOn:                expiredOn,
         DaysUntilExpiry:          0,
+        IsExpiringSoon:           false,
+        LastRemoteValidatedAtUtc: null);
+
+    private static LicenseGuardResult SuspendedResult(string message) => new(
+        IsValid:                  false,
+        Code:                     LicenseGuardCode.AccountSuspended,
+        Message:                  message,
+        Plan:                     null,
+        ExpiresOn:                null,
+        DaysUntilExpiry:          null,
         IsExpiringSoon:           false,
         LastRemoteValidatedAtUtc: null);
 

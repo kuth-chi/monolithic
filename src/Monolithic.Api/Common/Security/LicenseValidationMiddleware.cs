@@ -90,6 +90,36 @@ public sealed class LicenseValidationMiddleware(
 
         // 4. Fast local license check (no network)
         var db      = context.RequestServices.GetRequiredService<ApplicationDbContext>();
+
+        // 4a. Account suspension check — supersedes license state
+        var userActive = await db.Users
+            .AsNoTracking()
+            .Where(u => u.Id == ownerId)
+            .Select(u => new { u.IsActive, u.SuspendedReason })
+            .FirstOrDefaultAsync(context.RequestAborted);
+
+        if (userActive is not null && !userActive.IsActive)
+        {
+            logger.LogWarning(
+                "[LicenseMiddleware] Blocking suspended account {OwnerId} at {Path}.",
+                ownerId, path);
+
+            context.Response.StatusCode  = StatusCodes.Status403Forbidden;
+            context.Response.ContentType = "application/json";
+
+            var suspendedBody = JsonSerializer.Serialize(new
+            {
+                success = false,
+                code    = LicenseGuardCode.AccountSuspended,
+                message = userActive.SuspendedReason
+                          ?? "Your account has been suspended due to license integrity violations. Contact support.",
+                errors  = new[] { "Account suspended." },
+            });
+
+            await context.Response.WriteAsync(suspendedBody, context.RequestAborted);
+            return;
+        }
+
         var license = await db.BusinessLicenses
             .AsNoTracking()
             .Where(l => l.OwnerId == ownerId && l.Status == LicenseStatus.Active)

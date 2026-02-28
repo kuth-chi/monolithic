@@ -90,5 +90,7 @@ public sealed class LicenseStatusController(
         ExpiresOn:                r.ExpiresOn?.ToString("yyyy-MM-dd"),
         DaysUntilExpiry:          r.DaysUntilExpiry,
         IsExpiringSoon:           r.IsExpiringSoon,
-        LastRemoteValidatedAtUtc: r.LastRemoteValidatedAtUtc);
+        LastRemoteValidatedAtUtc: r.LastRemoteValidatedAtUtc,
+        TamperCount:              r.TamperCount,
+        TamperWarningMessage:     r.TamperWarningMessage);
 }

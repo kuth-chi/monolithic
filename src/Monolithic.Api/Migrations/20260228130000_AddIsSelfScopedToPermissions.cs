@@ -13,7 +13,7 @@ namespace Monolithic.Api.Migrations
             migrationBuilder.AddColumn<bool>(
                 name: "IsSelfScoped",
                 table: "Permissions",
-                type: "INTEGER",
+                type: "boolean",
                 nullable: false,
                 defaultValue: false);
         }

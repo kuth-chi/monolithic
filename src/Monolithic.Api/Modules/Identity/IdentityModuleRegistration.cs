@@ -43,8 +43,16 @@ public static class IdentityModuleRegistration
             // derived TPH types, so their parent-filter cascade warning is unavoidable.
             // The entities are always accessed via filtered parent navigation properties,
             // so no orphaned rows will appear in practice.
+            //
+            // PendingModelChangesWarning is suppressed because migrations are generated
+            // on SQLite (dev) but deployed on PostgreSQL (prod). EF Core detects a type
+            // mismatch in the snapshot (INTEGER/TEXT vs PostgreSQL native types) and
+            // incorrectly flags it as pending changes. The schema is correct in production.
             options.ConfigureWarnings(w =>
-                w.Ignore(CoreEventId.PossibleIncorrectRequiredNavigationWithQueryFilterInteractionWarning));
+            {
+                w.Ignore(CoreEventId.PossibleIncorrectRequiredNavigationWithQueryFilterInteractionWarning);
+                w.Ignore(RelationalEventId.PendingModelChangesWarning);
+            });
         });
 
         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());

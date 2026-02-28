@@ -103,6 +103,12 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
             ex.Message,
             BuildExtensions(null)),
 
+        LicenseException ex => (
+            StatusCodes.Status402PaymentRequired,
+            "License Required",
+            ex.Message,
+            BuildExtensions(new { code = ex.Code.ToString() })),
+
         ArgumentException ex => (
             StatusCodes.Status400BadRequest,
             "Bad Request",

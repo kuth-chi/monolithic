@@ -48,6 +48,26 @@ public class BusinessLicense
     public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? ModifiedAtUtc { get; set; }
 
+    // ── Validation / Expiry Guard fields ──────────────────────────────────────
+
+    /// <summary>
+    /// SHA-256 hex of (LicenseKey + OwnerId + StartsOn) concatenated.
+    /// Stored at activation and compared each remote validation cycle to detect tampering.
+    /// </summary>
+    public string? ValidationHash { get; set; }
+
+    /// <summary>
+    /// UTC timestamp of the last successful round-trip to the remote GitHub
+    /// license mapping file.  Null = never validated remotely.
+    /// </summary>
+    public DateTimeOffset? LastRemoteValidatedAtUtc { get; set; }
+
+    /// <summary>
+    /// Set to true when the expiry warning banner has been raised.
+    /// Reset to false if the license is renewed.
+    /// </summary>
+    public bool ExpirationWarningIssued { get; set; }
+
     // ── Navigation ────────────────────────────────────────────────────────────
 
     /// <summary>All businesses belonging to this owner.</summary>

@@ -80,6 +80,51 @@ public sealed class AuthService : IAuthService
             User: profile);
     }
 
+    public async Task<SignUpResponse?> SignUpAsync(
+        SignUpRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        // Return null (→ 409) if the email is already registered
+        var existing = await _userManager.FindByEmailAsync(request.Email);
+        if (existing is not null)
+        {
+            await _audit.LogSignUpFailedAsync(request.Email, "Email already registered", cancellationToken);
+            return null;
+        }
+
+        var user = new ApplicationUser
+        {
+            UserName = request.Email,
+            Email    = request.Email,
+            FullName = request.FullName,
+            IsActive = true,
+        };
+
+        var result = await _userManager.CreateAsync(user, request.Password);
+        if (!result.Succeeded)
+        {
+            var errors = string.Join("; ", result.Errors.Select(e => e.Description));
+            await _audit.LogSignUpFailedAsync(request.Email, errors, cancellationToken);
+            throw new InvalidOperationException($"User creation failed: {errors}");
+        }
+
+        // Assign default "User" role
+        await _userManager.AddToRoleAsync(user, "User");
+
+        // New user has no business memberships yet
+        var (roles, permissions) = await LoadRolesAndPermissionsAsync(user.Id, cancellationToken);
+        var token   = BuildAccessToken(user, roles, permissions, activeBusiness: null);
+        var profile = BuildMeResponse(user, memberships: [], activeBusiness: null, roles, permissions);
+
+        await _audit.LogSignUpSuccessAsync(user.Id, user.Email!, cancellationToken);
+
+        return new SignUpResponse(
+            AccessToken: new JwtSecurityTokenHandler().WriteToken(token),
+            TokenType: "Bearer",
+            ExpiresIn: _jwt.ExpiryMinutes * 60,
+            User: profile);
+    }
+
     public async Task<SwitchBusinessResponse?> SwitchDefaultBusinessAsync(
         Guid userId,
         Guid targetBusinessId,

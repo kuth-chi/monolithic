@@ -10,6 +10,7 @@ public static class BusinessModuleRegistration
     /// - Multi-business ownership + licensing
     /// - Multi-branch management
     /// - Business settings, media (logo/cover), holidays, attendance policies
+    /// - GitHub-backed license activation
     /// </summary>
     public static IServiceCollection AddBusinessModule(this IServiceCollection services)
     {
@@ -37,6 +38,19 @@ public static class BusinessModuleRegistration
         services.AddScoped<IBusinessMediaService, BusinessMediaService>();
         services.AddScoped<IBusinessHolidayService, BusinessHolidayService>();
         services.AddScoped<IAttendancePolicyService, AttendancePolicyService>();
+
+        // ── GitHub-backed License Activation ────────────────────────────────
+        // HttpClient is managed by IHttpClientFactory; retry policy can be added here.
+        services.AddMemoryCache();
+        services.AddHttpClient<IGitHubLicenseFetchService, GitHubLicenseFetchService>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(10);
+            client.DefaultRequestHeaders.Add("User-Agent", "SMERP-LicenseClient/1.0");
+        });
+        services.AddScoped<ILicenseActivationService, LicenseActivationService>();
+
+        // ── License Guard & Expiry Monitor ──────────────────────────────────
+        services.AddScoped<ILicenseGuardService, LicenseGuardService>();
 
         return services;
     }

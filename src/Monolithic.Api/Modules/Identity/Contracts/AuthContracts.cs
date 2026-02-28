@@ -8,10 +8,36 @@ public sealed record LoginRequest(string Email, string Password);
 /// <summary>Requests a business-context switch for the authenticated user.</summary>
 public sealed record SwitchBusinessRequest(Guid BusinessId);
 
+/// <summary>
+/// Payload for self-service registration.
+/// Creates a new <c>ApplicationUser</c>, assigns the default "User" role,
+/// and immediately returns a JWT — user is logged in on successful signup.
+/// </summary>
+public sealed record SignUpRequest(
+    /// <summary>User's full display name (2–120 chars).</summary>
+    string FullName,
+    /// <summary>Email address — must be unique in the system.</summary>
+    string Email,
+    /// <summary>Desired password (min 8 chars, upper, lower, digit).</summary>
+    string Password,
+    /// <summary>Must match <see cref="Password"/> exactly.</summary>
+    string ConfirmPassword);
+
 // ── Response DTOs ────────────────────────────────────────────────────────────
 
 /// <summary>Returned on successful login.</summary>
 public sealed record LoginResponse(
+    string AccessToken,
+    string TokenType,
+    int ExpiresIn,
+    MeResponse User);
+
+/// <summary>
+/// Returned on successful self-service registration.
+/// Carries the same JWT payload as <see cref="LoginResponse"/> so the client
+/// can immediately authenticate without an extra round-trip.
+/// </summary>
+public sealed record SignUpResponse(
     string AccessToken,
     string TokenType,
     int ExpiresIn,

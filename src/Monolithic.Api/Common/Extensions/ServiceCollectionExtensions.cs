@@ -9,6 +9,7 @@ using Monolithic.Api.Common.Errors;
 using Monolithic.Api.Common.Security;
 using Monolithic.Api.Common.Storage;
 using Monolithic.Api.Common.Validation;
+using Monolithic.Api.Modules.Business.Contracts;
 using Monolithic.Api.Modules.Platform.Core.Infrastructure;
 
 namespace Monolithic.Api.Common.Extensions;
@@ -129,6 +130,13 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(purgeOptions);
         services.AddHostedService<SoftDeletePurgeService>();
 
+        // ── License Guard options + Background Monitor ─────────────────────────
+        var licenseGuardOptions = configuration
+            .GetSection(LicenseGuardOptions.SectionName)
+            .Get<LicenseGuardOptions>() ?? new LicenseGuardOptions();
+        services.AddSingleton(licenseGuardOptions);
+        services.AddHostedService<LicenseExpirationMonitorService>();
+
         // ── Module Discovery — plug-and-play OS kernel ────────────────────────
         // Creates the registry eagerly (before DI build) and calls Discover()
         // so every IModule.RegisterServices() is invoked here in dependency order.
@@ -176,6 +184,10 @@ public static class ServiceCollectionExtensions
         var registry = app.Services.GetRequiredService<ModuleRegistry>();
         registry.SetLogger(app.Services.GetRequiredService<ILogger<ModuleRegistry>>());
         registry.ConfigureAll(app);
+
+        // ── License Validation Gate ─────────────────────────────────────────
+        // Must be placed AFTER authentication/authorization but BEFORE controllers.
+        app.UseMiddleware<LicenseValidationMiddleware>();
 
         app.MapControllers();
 

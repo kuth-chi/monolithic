@@ -3,10 +3,18 @@ using Monolithic.Api.Modules.Identity.Contracts;
 namespace Monolithic.Api.Modules.Identity.Application;
 
 /// <summary>
-/// Authentication service: login, business-context switching, and caller profile.
+/// Authentication service: registration, login, business-context switching, and caller profile.
 /// </summary>
 public interface IAuthService
 {
+    /// <summary>
+    /// Creates a new user account, assigns the default "User" role, and returns a JWT.
+    /// Returns <c>null</c> when the email is already registered (caller should return 409).
+    /// Throws <see cref="InvalidOperationException"/> when Identity creation fails
+    /// (e.g. password policy violations that bypass the validator).
+    /// </summary>
+    Task<SignUpResponse?> SignUpAsync(SignUpRequest request, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Validates credentials and returns an access token scoped to the user's default business.
     /// Returns <c>null</c> when credentials are invalid or the account is inactive.

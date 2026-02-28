@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Monolithic.Api.Common.Configuration;
+using Monolithic.Api.Modules.Platform.Contracts;
 using Monolithic.Api.Modules.Platform.Core.Abstractions;
 using Monolithic.Api.Modules.Platform.Core.Infrastructure;
 using Monolithic.Api.Modules.Platform.FeatureFlags.Application;
@@ -102,6 +104,23 @@ public static class PlatformModuleRegistration
         // ── Notification config ───────────────────────────────────────────────
         services.Configure<NotificationOptions>(
             configuration.GetSection(NotificationOptions.SectionName));
+
+        // ── Docker Update Service ─────────────────────────────────────────────
+        // Reads /var/run/docker.sock (mounted via docker-compose) to compare
+        // local image digests with Docker Hub.  ApplyUpdatesAsync dispatches a
+        // detached shell process that pulls + restarts containers without
+        // blocking the HTTP request or dying when the container restarts.
+        var dockerUpdateOptions = configuration
+            .GetSection(DockerUpdateOptions.SectionName)
+            .Get<DockerUpdateOptions>() ?? new DockerUpdateOptions();
+
+        services.AddSingleton(dockerUpdateOptions);
+        services.AddMemoryCache();
+        services.AddScoped<IDockerUpdateService>(sp =>
+            new DockerUpdateService(
+                sp.GetRequiredService<DockerUpdateOptions>(),
+                sp.GetRequiredService<IMemoryCache>(),
+                sp.GetRequiredService<ILogger<DockerUpdateService>>()));
 
         return services;
     }

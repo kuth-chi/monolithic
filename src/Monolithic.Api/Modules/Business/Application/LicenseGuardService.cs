@@ -122,15 +122,26 @@ public sealed class LicenseGuardService(
         }
 
         // 4. Find entry in remote mapping
-        var entry = mapping.Licenses.FirstOrDefault(
-            e => string.Equals(e.Email, ownerEmail, StringComparison.OrdinalIgnoreCase));
+        //    An email can appear in multiple entries (one per business set / license tier).
+        //    Prefer the entry whose license key matches what was activated locally; fall back to first.
+        var emailEntries = mapping.Licenses
+            .Where(e => string.Equals(e.Email, ownerEmail, StringComparison.OrdinalIgnoreCase))
+            .ToList();
 
-        if (entry is null)
+        if (emailEntries.Count == 0)
         {
             logger.LogWarning("[LicenseGuard] Email {Email} not found in remote mapping. Revoking.", ownerEmail);
             await RevokeLicenseAsync(license, "Email not found in remote mapping.", ct);
             return RevokedResult("Your email was removed from the license registry. Contact support.");
         }
+
+        // Match by stored license key so multi-entry accounts resolve to the correct tier
+        var entry = (!string.IsNullOrWhiteSpace(license.ExternalSubscriptionId)
+                        ? emailEntries.FirstOrDefault(e =>
+                            string.Equals(e.License?.LicenseKey, license.ExternalSubscriptionId,
+                                StringComparison.OrdinalIgnoreCase))
+                        : null)
+                    ?? emailEntries.First();
 
         var remote = entry.License;
 

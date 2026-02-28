@@ -125,22 +125,27 @@ public sealed class LicenseActivationService(
             return Fail("Unable to reach the license server. Please try again later or contact support.");
         }
 
-        // 3. Find matching entry by email (case-insensitive)
-        var entry = mapping.Licenses.FirstOrDefault(
-            e => string.Equals(e.Email, ownerEmail, StringComparison.OrdinalIgnoreCase));
+        // 3. Find matching entries by email (case-insensitive)
+        //    A single email can appear in multiple entries (one per registered business set),
+        //    so we must search across all matching entries for the specific businessId.
+        var businessIdStr = businessId.ToString().ToLowerInvariant();
+        var emailEntries  = mapping.Licenses
+            .Where(e => string.Equals(e.Email, ownerEmail, StringComparison.OrdinalIgnoreCase))
+            .ToList();
 
-        if (entry is null)
+        if (emailEntries.Count == 0)
         {
             return Fail(
                 $"Your email address ({ownerEmail}) is not found in our license registry. " +
                 "Please contact the SMERP team with your email and Business ID.");
         }
 
-        // 4. Verify the businessId is in the allowed list (lowercase comparison)
-        var businessIdStr = businessId.ToString().ToLowerInvariant();
-        var allowed       = entry.BusinessIds.Select(id => id.ToLowerInvariant()).ToList();
+        // 4. Among all entries for this email, find the one that owns the requested businessId
+        var entry = emailEntries.FirstOrDefault(
+            e => e.BusinessIds.Any(
+                id => string.Equals(id, businessIdStr, StringComparison.OrdinalIgnoreCase)));
 
-        if (!allowed.Contains(businessIdStr))
+        if (entry is null)
         {
             return Fail(
                 $"Business ID {businessId} is not registered under your license. " +
@@ -197,13 +202,18 @@ public sealed class LicenseActivationService(
 
         if (ownerEmail is not null && mapping is not null)
         {
-            var entry = mapping.Licenses.FirstOrDefault(
-                e => string.Equals(e.Email, ownerEmail, StringComparison.OrdinalIgnoreCase));
+            // Scan all entries for this email — multiple entries per email are supported
+            // (one entry per registered business set / license tier).
+            var bizIdStr     = businessId.ToString().ToLowerInvariant();
+            var emailEntries = mapping.Licenses
+                .Where(e => string.Equals(e.Email, ownerEmail, StringComparison.OrdinalIgnoreCase))
+                .ToList();
 
-            emailFound = entry is not null;
-            if (entry is not null)
-                bizIdFound = entry.BusinessIds.Any(
-                    id => string.Equals(id, businessId.ToString(), StringComparison.OrdinalIgnoreCase));
+            emailFound = emailEntries.Count > 0;
+            if (emailFound)
+                bizIdFound = emailEntries.Any(
+                    e => e.BusinessIds.Any(
+                        id => string.Equals(id, bizIdStr, StringComparison.OrdinalIgnoreCase)));
         }
 
         // Check local activation state

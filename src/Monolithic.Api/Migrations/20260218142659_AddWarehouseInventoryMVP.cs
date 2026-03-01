@@ -91,7 +91,7 @@ namespace Monolithic.Api.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "IsActive",
                 table: "Vendors",
-                type: "INTEGER",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(bool),
                 oldType: "boolean");
@@ -173,7 +173,7 @@ namespace Monolithic.Api.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "Granted",
                 table: "UserPermissions",
-                type: "INTEGER",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(bool),
                 oldType: "boolean");
@@ -587,7 +587,7 @@ namespace Monolithic.Api.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "IsActive",
                 table: "InventoryItems",
-                type: "INTEGER",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(bool),
                 oldType: "boolean");
@@ -816,7 +816,7 @@ namespace Monolithic.Api.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "IsActive",
                 table: "Businesses",
-                type: "INTEGER",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(bool),
                 oldType: "boolean");
@@ -902,7 +902,7 @@ namespace Monolithic.Api.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "IsPrimary",
                 table: "BusinessContacts",
-                type: "INTEGER",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(bool),
                 oldType: "boolean");
@@ -982,7 +982,7 @@ namespace Monolithic.Api.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "IsPrimary",
                 table: "BankAccounts",
-                type: "INTEGER",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(bool),
                 oldType: "boolean");
@@ -990,7 +990,7 @@ namespace Monolithic.Api.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "IsActive",
                 table: "BankAccounts",
-                type: "INTEGER",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(bool),
                 oldType: "boolean");
@@ -1136,7 +1136,7 @@ namespace Monolithic.Api.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "TwoFactorEnabled",
                 table: "AspNetUsers",
-                type: "INTEGER",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(bool),
                 oldType: "boolean");
@@ -1182,7 +1182,7 @@ namespace Monolithic.Api.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "PhoneNumberConfirmed",
                 table: "AspNetUsers",
-                type: "INTEGER",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(bool),
                 oldType: "boolean");
@@ -1241,7 +1241,7 @@ namespace Monolithic.Api.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "LockoutEnabled",
                 table: "AspNetUsers",
-                type: "INTEGER",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(bool),
                 oldType: "boolean");
@@ -1269,7 +1269,7 @@ namespace Monolithic.Api.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "IsActive",
                 table: "AspNetUsers",
-                type: "INTEGER",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(bool),
                 oldType: "boolean");
@@ -1316,7 +1316,7 @@ namespace Monolithic.Api.Migrations
             migrationBuilder.AlterColumn<bool>(
                 name: "EmailConfirmed",
                 table: "AspNetUsers",
-                type: "INTEGER",
+                type: "boolean",
                 nullable: false,
                 oldClrType: typeof(bool),
                 oldType: "boolean");

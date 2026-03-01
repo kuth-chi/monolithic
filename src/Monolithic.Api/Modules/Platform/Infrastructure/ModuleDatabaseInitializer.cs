@@ -34,10 +34,10 @@ public static class ModuleDatabaseInitializer
     /// <see cref="IModule.GetDatabaseDescriptor"/>.
     /// </summary>
     public static async Task MigrateAllAsync(
-        IServiceScope       scope,
-        IConfiguration      configuration,
-        ILogger             logger,
-        CancellationToken   ct = default)
+        IServiceScope scope,
+        IConfiguration configuration,
+        ILogger logger,
+        CancellationToken ct = default)
     {
         // Allow ops teams to disable auto-migration in production (default: enabled)
         var autoMigrate = configuration.GetValue(AutoMigrateConfigKey, defaultValue: true);
@@ -50,7 +50,7 @@ public static class ModuleDatabaseInitializer
         }
 
         var registry = scope.ServiceProvider.GetRequiredService<ModuleRegistry>();
-        var sp       = scope.ServiceProvider;
+        var sp = scope.ServiceProvider;
 
         foreach (var module in registry.Modules)
         {
@@ -95,9 +95,11 @@ public static class ModuleDatabaseInitializer
                 // A failed migration is fatal — the module cannot operate with a stale schema.
                 logger.LogCritical(ex,
                     "[ModuleDatabaseInitializer] Database migration FAILED for module '{Label}'. " +
-                    "The application will continue but the module may be non-functional. " +
+                    "Startup will be aborted to avoid running with stale schema. " +
                     "Check the connection string at config key '{Key}'.",
                     label, descriptor.ConnectionStringKey);
+
+                throw;
             }
         }
     }

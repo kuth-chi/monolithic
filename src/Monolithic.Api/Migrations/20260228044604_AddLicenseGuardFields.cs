@@ -11,6 +11,30 @@ namespace Monolithic.Api.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            if (ActiveProvider == "Npgsql.EntityFrameworkCore.PostgreSQL")
+            {
+                migrationBuilder.AddColumn<bool>(
+                    name: "ExpirationWarningIssued",
+                    table: "BusinessLicenses",
+                    type: "boolean",
+                    nullable: false,
+                    defaultValue: false);
+
+                migrationBuilder.AddColumn<DateTimeOffset>(
+                    name: "LastRemoteValidatedAtUtc",
+                    table: "BusinessLicenses",
+                    type: "timestamp with time zone",
+                    nullable: true);
+
+                migrationBuilder.AddColumn<string>(
+                    name: "ValidationHash",
+                    table: "BusinessLicenses",
+                    type: "text",
+                    nullable: true);
+
+                return;
+            }
+
             migrationBuilder.DropForeignKey(
                 name: "FK_CostLedgerEntries_InventoryItemVariants_InventoryItemVarian~",
                 table: "CostLedgerEntries");
@@ -9323,6 +9347,23 @@ namespace Monolithic.Api.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            if (ActiveProvider == "Npgsql.EntityFrameworkCore.PostgreSQL")
+            {
+                migrationBuilder.DropColumn(
+                    name: "ExpirationWarningIssued",
+                    table: "BusinessLicenses");
+
+                migrationBuilder.DropColumn(
+                    name: "LastRemoteValidatedAtUtc",
+                    table: "BusinessLicenses");
+
+                migrationBuilder.DropColumn(
+                    name: "ValidationHash",
+                    table: "BusinessLicenses");
+
+                return;
+            }
+
             migrationBuilder.DropForeignKey(
                 name: "FK_CostLedgerEntries_InventoryItemVariants_InventoryItemVariantId",
                 table: "CostLedgerEntries");

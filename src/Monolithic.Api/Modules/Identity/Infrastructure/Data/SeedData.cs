@@ -30,6 +30,10 @@ public static class SeedData
         // Guarded by explicit config + confirmation token to avoid accidental data loss.
         await TryResetBootstrapDataAsync(context, configuration, logger);
 
+        // Ensure OWNER role always exists, even when legacy schema checks
+        // force permission seeding to be skipped.
+        await EnsureOwnerRoleAsync(roleManager, logger);
+
         if (!await ColumnExistsAsync(context, "Permissions", "ActionName"))
         {
             logger.LogWarning(
@@ -411,6 +415,45 @@ public static class SeedData
             return "General";
 
         return CultureInfo.InvariantCulture.TextInfo.ToTitleCase(cleaned);
+    }
+
+    private static async Task EnsureOwnerRoleAsync(
+        RoleManager<ApplicationRole> roleManager,
+        ILogger logger)
+    {
+        var ownerRole = await roleManager.FindByNameAsync(SystemRoleNames.Owner);
+        if (ownerRole is null)
+        {
+            ownerRole = new ApplicationRole
+            {
+                Id = Guid.NewGuid(),
+                Name = SystemRoleNames.Owner,
+                Description = "Platform owner — full unrestricted access",
+                IsSystemRole = true,
+            };
+
+            var created = await roleManager.CreateAsync(ownerRole);
+            if (!created.Succeeded)
+            {
+                logger.LogWarning(
+                    "[Seed] Failed to create OWNER role: {Errors}",
+                    string.Join("; ", created.Errors.Select(e => e.Description)));
+            }
+
+            return;
+        }
+
+        if (!ownerRole.IsSystemRole)
+        {
+            ownerRole.IsSystemRole = true;
+            var updated = await roleManager.UpdateAsync(ownerRole);
+            if (!updated.Succeeded)
+            {
+                logger.LogWarning(
+                    "[Seed] Failed to patch OWNER role as system-protected: {Errors}",
+                    string.Join("; ", updated.Errors.Select(e => e.Description)));
+            }
+        }
     }
 
     private static async Task<(ApplicationRole ownerRole, ApplicationRole systemAdminRole, ApplicationRole staffRole, ApplicationRole userRole)> SeedRolesAsync(

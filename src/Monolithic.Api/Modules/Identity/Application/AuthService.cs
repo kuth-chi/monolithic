@@ -16,6 +16,8 @@ namespace Monolithic.Api.Modules.Identity.Application;
 /// <inheritdoc cref="IAuthService"/>
 public sealed class AuthService : IAuthService
 {
+    private const string FullAccessPermission = "*:full";
+
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ApplicationDbContext _db;
     private readonly JwtOptions _jwt;
@@ -107,7 +109,7 @@ public sealed class AuthService : IAuthService
         var user = new ApplicationUser
         {
             UserName = request.Email,
-            Email    = request.Email,
+            Email = request.Email,
             FullName = request.FullName,
             IsActive = true,
         };
@@ -121,12 +123,17 @@ public sealed class AuthService : IAuthService
         }
 
         // Assign Owner to the first user; all subsequent accounts start as User.
-        var defaultRole = isFirstUser ? SystemRoleNames.Owner : "User";
+        var defaultRole = isFirstUser ? SystemRoleNames.Owner : SystemRoleNames.User;
+        await EnsureRoleExistsAsync(
+            defaultRole,
+            defaultRole == SystemRoleNames.Owner
+                ? "Platform owner — full unrestricted access"
+                : "Regular user with minimal access");
         await _userManager.AddToRoleAsync(user, defaultRole);
 
         // New user has no business memberships yet
         var (roles, permissions) = await LoadRolesAndPermissionsAsync(user.Id, cancellationToken);
-        var token   = BuildAccessToken(user, roles, permissions, activeBusiness: null);
+        var token = BuildAccessToken(user, roles, permissions, activeBusiness: null);
         var profile = BuildMeResponse(user, memberships: [], activeBusiness: null, roles, permissions);
 
         await _audit.LogSignUpSuccessAsync(user.Id, user.Email!, cancellationToken);
@@ -254,7 +261,42 @@ public sealed class AuthService : IAuthService
             .ToList()
             .AsReadOnly();
 
+        // Protected admin roles must always have full access immediately,
+        // even when legacy/partial schema prevents role-permission seed rows.
+        if (roles.Contains(SystemRoleNames.Owner, StringComparer.OrdinalIgnoreCase)
+            || roles.Contains(SystemRoleNames.SystemAdmin, StringComparer.OrdinalIgnoreCase))
+        {
+            if (!allPermissions.Contains(FullAccessPermission, StringComparer.Ordinal))
+            {
+                allPermissions = allPermissions
+                    .Append(FullAccessPermission)
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(x => x)
+                    .ToList()
+                    .AsReadOnly();
+            }
+        }
+
         return (roles, allPermissions);
+    }
+
+    private async Task EnsureRoleExistsAsync(string roleName, string description)
+    {
+        var existing = await _db.Roles
+            .AsNoTracking()
+            .AnyAsync(r => r.Name != null && r.Name.ToUpper() == roleName.ToUpper());
+        if (existing)
+            return;
+
+        await _db.Roles.AddAsync(new ApplicationRole
+        {
+            Id = Guid.NewGuid(),
+            Name = roleName,
+            Description = description,
+            IsSystemRole = true,
+        });
+
+        await _db.SaveChangesAsync();
     }
 
     /// <summary>
@@ -311,12 +353,17 @@ public sealed class AuthService : IAuthService
         IReadOnlyList<string> roles,
         IReadOnlyList<string> permissions)
     {
+        var isAdmin = roles.Contains(SystemRoleNames.Owner, StringComparer.OrdinalIgnoreCase)
+                      || roles.Contains(SystemRoleNames.SystemAdmin, StringComparer.OrdinalIgnoreCase)
+                      || permissions.Contains(FullAccessPermission, StringComparer.Ordinal);
+
         return new MeResponse(
             UserId: user.Id,
             Email: user.Email ?? string.Empty,
             FullName: user.FullName,
             ActiveBusiness: activeBusiness is not null ? ToSummary(activeBusiness) : null,
             AllBusinesses: memberships.Select(ToSummary).ToList(),
+            IsAdmin: isAdmin,
             Roles: roles,
             Permissions: permissions);
     }
@@ -332,7 +379,7 @@ public sealed class AuthService : IAuthService
     {
         // Wrapper class required by ITwoLevelCache<T> where T : class constraint.
         var cached = await _cache.GetOrCreateAsync(
-            key:     CacheKeys.SystemHasUsers,
+            key: CacheKeys.SystemHasUsers,
             factory: async ct =>
             {
                 // Single-column EXISTS projection — avoids loading any entity graph.

@@ -10,8 +10,9 @@ public sealed record SwitchBusinessRequest(Guid BusinessId);
 
 /// <summary>
 /// Payload for self-service registration.
-/// Creates a new <c>ApplicationUser</c>, assigns the default "User" role,
-/// and immediately returns a JWT — user is logged in on successful signup.
+/// Creates a new <c>ApplicationUser</c> and immediately returns a JWT.
+/// The very first account in a fresh installation is assigned the <c>Owner</c>
+/// role automatically; subsequent accounts default to <c>User</c>.
 /// </summary>
 public sealed record SignUpRequest(
     /// <summary>User's full display name (2–120 chars).</summary>
@@ -57,6 +58,7 @@ public sealed record MeResponse(
     string FullName,
     UserBusinessSummary? ActiveBusiness,
     IReadOnlyList<UserBusinessSummary> AllBusinesses,
+    bool IsAdmin,
     IReadOnlyList<string> Roles,
     IReadOnlyList<string> Permissions);
 

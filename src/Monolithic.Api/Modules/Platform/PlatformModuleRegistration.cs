@@ -44,23 +44,11 @@ public static class PlatformModuleRegistration
         // ── Platform Foundation Database ──────────────────────────────────────
         services.AddDbContext<PlatformDbContext>(options =>
         {
-            if (environment.IsDevelopment())
-            {
-                // Share the same SQLite file in Development for simplicity.
-                // Each table lives in its own logical context but in one physical file.
-                var sqliteConn = configuration
-                    [$"{InfrastructureOptions.SectionName}:Databases:Platform:ConnectionString"]
-                    ?? configuration
-                    [$"{InfrastructureOptions.SectionName}:{nameof(InfrastructureOptions.SQLite)}:{nameof(SqliteOptions.ConnectionString)}"]
-                    ?? "Data Source=monolithic_dev.db";
-                options.UseSqlite(sqliteConn);
-            }
-            else
-            {
-                var pgConn = configuration
-                    [$"{InfrastructureOptions.SectionName}:Databases:Platform:ConnectionString"];
-                options.UseNpgsql(pgConn);
-            }
+            var pgConn = configuration
+                [$"{InfrastructureOptions.SectionName}:Databases:Platform:ConnectionString"]
+                ?? configuration
+                [$"{InfrastructureOptions.SectionName}:{nameof(InfrastructureOptions.PostgreSql)}:{nameof(PostgresOptions.ConnectionString)}"];
+            options.UseNpgsql(pgConn);
         });
 
         services.AddScoped<IPlatformDbContext>(

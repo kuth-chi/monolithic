@@ -6,8 +6,6 @@ public sealed class InfrastructureOptions
 
     public PostgresOptions PostgreSql { get; init; } = new();
 
-    public SqliteOptions SQLite { get; init; } = new();
-
     public RedisOptions Redis { get; init; } = new();
 
     public RabbitMqOptions RabbitMq { get; init; } = new();
@@ -16,11 +14,6 @@ public sealed class InfrastructureOptions
 public sealed class PostgresOptions
 {
     public string ConnectionString { get; init; } = string.Empty;
-}
-
-public sealed class SqliteOptions
-{
-    public string ConnectionString { get; init; } = "Data Source=monolithic_dev.db";
 }
 
 public sealed class RedisOptions

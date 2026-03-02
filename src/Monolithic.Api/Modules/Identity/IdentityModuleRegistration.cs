@@ -21,37 +21,23 @@ public static class IdentityModuleRegistration
         IConfiguration configuration,
         IWebHostEnvironment environment)
     {
-        // EF Core DbContext — SQLite in Development, PostgreSQL in Production
+        // EF Core DbContext — PostgreSQL in all environments
         // Also registered as IApplicationDbContext so all modules can depend on the
         // abstraction rather than the concrete infrastructure type.
         services.AddDbContext<ApplicationDbContext>(options =>
         {
-            if (environment.IsDevelopment())
-            {
-                var sqliteConnectionString = configuration[$"{InfrastructureOptions.SectionName}:{nameof(InfrastructureOptions.SQLite)}:{nameof(SqliteOptions.ConnectionString)}"]
-                    ?? "Data Source=monolithic_dev.db";
-                options.UseSqlite(sqliteConnectionString);
-            }
-            else
-            {
-                var pgConnectionString = configuration[$"{InfrastructureOptions.SectionName}:{nameof(InfrastructureOptions.PostgreSql)}:{nameof(PostgresOptions.ConnectionString)}"];
-                options.UseNpgsql(pgConnectionString);
-            }
+            var pgConnectionString = configuration[$"{InfrastructureOptions.SectionName}:Databases:Identity:ConnectionString"]
+                ?? configuration[$"{InfrastructureOptions.SectionName}:{nameof(InfrastructureOptions.PostgreSql)}:{nameof(PostgresOptions.ConnectionString)}"];
+            options.UseNpgsql(pgConnectionString);
 
             // BusinessBankAccount, CustomerBankAccount and VendorBankAccount all derive
             // from BankAccountBase (TPH hierarchy). EF Core prohibits HasQueryFilter on
             // derived TPH types, so their parent-filter cascade warning is unavoidable.
             // The entities are always accessed via filtered parent navigation properties,
             // so no orphaned rows will appear in practice.
-            //
-            // PendingModelChangesWarning is suppressed because migrations are generated
-            // on SQLite (dev) but deployed on PostgreSQL (prod). EF Core detects a type
-            // mismatch in the snapshot (INTEGER/TEXT vs PostgreSQL native types) and
-            // incorrectly flags it as pending changes. The schema is correct in production.
             options.ConfigureWarnings(w =>
             {
                 w.Ignore(CoreEventId.PossibleIncorrectRequiredNavigationWithQueryFilterInteractionWarning);
-                w.Ignore(RelationalEventId.PendingModelChangesWarning);
             });
         });
 

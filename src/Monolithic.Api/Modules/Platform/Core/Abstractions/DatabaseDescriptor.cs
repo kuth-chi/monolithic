@@ -28,9 +28,6 @@ public sealed record DatabaseDescriptor(
     /// <summary>
     /// IConfiguration key that holds the connection string.
     /// Example: <c>"Infrastructure:Databases:Platform"</c>
-    ///
-    /// In Development the key should resolve to a SQLite file path.
-    /// In Production it should resolve to a PostgreSQL DSN.
     /// </summary>
     string ConnectionStringKey,
 

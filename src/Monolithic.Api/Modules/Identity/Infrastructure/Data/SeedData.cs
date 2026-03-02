@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using System.Globalization;
 using System.Text;
 using BusinessDomain = Monolithic.Api.Modules.Business.Domain;
@@ -29,13 +30,34 @@ public static class SeedData
         // Guarded by explicit config + confirmation token to avoid accidental data loss.
         await TryResetBootstrapDataAsync(context, configuration, logger);
 
-        // ── Step 1: Permissions ───────────────────────────────────────────────
-        logger.LogInformation("[Seed] Step 1/6 — Permissions");
-        var permissions = await SeedPermissionsAsync(context, logger);
+        if (!await ColumnExistsAsync(context, "Permissions", "ActionName"))
+        {
+            logger.LogWarning(
+                "[Seed] Skipping permission/role seed because schema is missing column '{Column}' on table '{Table}'. Startup will continue.",
+                "ActionName",
+                "Permissions");
+            return;
+        }
 
-        // ── Step 2: Roles ─────────────────────────────────────────────────────
-        logger.LogInformation("[Seed] Step 2/6 — Roles");
-        await SeedRolesAsync(roleManager, context, permissions, logger);
+        try
+        {
+            // ── Step 1: Permissions ───────────────────────────────────────────
+            logger.LogInformation("[Seed] Step 1/6 — Permissions");
+            var permissions = await SeedPermissionsAsync(context, logger);
+
+            // ── Step 2: Roles ─────────────────────────────────────────────────
+            logger.LogInformation("[Seed] Step 2/6 — Roles");
+            await SeedRolesAsync(roleManager, context, permissions, logger);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UndefinedColumn } postgresEx)
+        {
+            logger.LogWarning(
+                "[Seed] Skipping permission/role seed due to legacy schema mismatch ({SqlState}: {Message}). " +
+                "Startup will continue.",
+                postgresEx.SqlState,
+                postgresEx.MessageText);
+            return;
+        }
 
         // ── Step 3-6: Seed policy (disabled for users/business/licenses) ──────
         // Keep these tables empty on startup:
@@ -529,6 +551,44 @@ public static class SeedData
         ]);
 
         return (ownerRole, systemAdminRole, staffRole, userRole);
+    }
+
+    private static async Task<bool> ColumnExistsAsync(ApplicationDbContext db, string tableName, string columnName)
+    {
+        var connection = db.Database.GetDbConnection();
+        var shouldClose = connection.State != System.Data.ConnectionState.Open;
+        if (shouldClose)
+            await connection.OpenAsync();
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = @"
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = @tableName
+                  AND column_name = @columnName
+                LIMIT 1;";
+
+            var tableParam = command.CreateParameter();
+            tableParam.ParameterName = "@tableName";
+            tableParam.Value = tableName;
+            command.Parameters.Add(tableParam);
+
+            var columnParam = command.CreateParameter();
+            columnParam.ParameterName = "@columnName";
+            columnParam.Value = columnName;
+            command.Parameters.Add(columnParam);
+
+            var result = await command.ExecuteScalarAsync();
+            return result is not null && result is not DBNull;
+        }
+        finally
+        {
+            if (shouldClose)
+                await connection.CloseAsync();
+        }
     }
 
     private static async Task AssignPermissionsToRoleAsync(

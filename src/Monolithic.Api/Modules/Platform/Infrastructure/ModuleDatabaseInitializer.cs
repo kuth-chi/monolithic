@@ -19,36 +19,19 @@ namespace Monolithic.Api.Modules.Platform.Infrastructure;
 ///     hits that module — a hard deploy failure rolls back before any schema change.
 ///   • Idempotent: EF Core migrations are applied only once; already-applied
 ///     migrations are skipped via the __EFMigrationsHistory table.
-///
-/// When NOT to use this:
-///   If your production deployment policy forbids runtime schema changes, set
-///   PLATFORM__AutoMigrateOnStartup=false and run migrations via CI/CD instead.
 /// </summary>
 // ═══════════════════════════════════════════════════════════════════════════════
 public static class ModuleDatabaseInitializer
 {
-    private const string AutoMigrateConfigKey = "Platform:AutoMigrateOnStartup";
-
     /// <summary>
     /// Migrates every module database that is registered via
     /// <see cref="IModule.GetDatabaseDescriptor"/>.
     /// </summary>
     public static async Task MigrateAllAsync(
         IServiceScope scope,
-        IConfiguration configuration,
         ILogger logger,
         CancellationToken ct = default)
     {
-        // Allow ops teams to disable auto-migration in production (default: enabled)
-        var autoMigrate = configuration.GetValue(AutoMigrateConfigKey, defaultValue: true);
-        if (!autoMigrate)
-        {
-            logger.LogInformation(
-                "[ModuleDatabaseInitializer] Auto-migration is disabled " +
-                "(Platform:AutoMigrateOnStartup=false). Skipping.");
-            return;
-        }
-
         var registry = scope.ServiceProvider.GetRequiredService<ModuleRegistry>();
         var sp = scope.ServiceProvider;
 

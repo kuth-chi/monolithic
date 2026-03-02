@@ -26,8 +26,7 @@ public static class PlatformStartup
         logger.LogInformation("[Platform] Running startup initialization...");
 
         // ── Step 1: Migrate all module databases before seeding data ──────────
-        var config = sp.GetRequiredService<IConfiguration>();
-        await ModuleDatabaseInitializer.MigrateAllAsync(scope, config, logger);
+        await ModuleDatabaseInitializer.MigrateAllAsync(scope, logger);
 
         // ── Step 2: Module first-run hooks (seed reference data) ──────────────
         await RunModuleFirstRunHooksAsync(scope);

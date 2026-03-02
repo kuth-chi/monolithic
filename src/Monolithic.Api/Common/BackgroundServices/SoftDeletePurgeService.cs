@@ -3,6 +3,7 @@ using Monolithic.Api.Common.SoftDelete;
 using Monolithic.Api.Modules.Business.Domain;
 using Monolithic.Api.Modules.Identity.Domain;
 using Monolithic.Api.Modules.Identity.Infrastructure.Data;
+using Npgsql;
 
 namespace Monolithic.Api.Common.BackgroundServices;
 
@@ -31,8 +32,8 @@ public sealed class SoftDeletePurgeService : BackgroundService
         SoftDeletePurgeOptions options)
     {
         _scopeFactory = scopeFactory;
-        _logger       = logger;
-        _options      = options;
+        _logger = logger;
+        _options = options;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -47,6 +48,13 @@ public sealed class SoftDeletePurgeService : BackgroundService
             try
             {
                 await RunPurgeAsync(stoppingToken);
+            }
+            catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UndefinedTable)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "[SoftDeletePurge] Skipping purge run because required table(s) are missing in current schema. " +
+                    "Run database migrations to enable purge.");
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -65,6 +73,14 @@ public sealed class SoftDeletePurgeService : BackgroundService
 
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        if (!await TableExistsAsync(db, "BusinessSettings", ct))
+        {
+            _logger.LogWarning(
+                "[SoftDeletePurge] Skipping purge run because table '{Table}' does not exist in current schema.",
+                "BusinessSettings");
+            return;
+        }
 
         // Build a lookup: businessId → effective retention days
         var businessRetentions = await db.BusinessSettings
@@ -132,5 +148,32 @@ public sealed class SoftDeletePurgeService : BackgroundService
         }
 
         return total;
+    }
+
+    private static async Task<bool> TableExistsAsync(ApplicationDbContext db, string tableName, CancellationToken ct)
+    {
+        var connection = db.Database.GetDbConnection();
+        var shouldClose = connection.State != System.Data.ConnectionState.Open;
+        if (shouldClose)
+            await connection.OpenAsync(ct);
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT to_regclass(@schemaQualifiedName)::text;";
+
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = "@schemaQualifiedName";
+            parameter.Value = $"public.\"{tableName}\"";
+            command.Parameters.Add(parameter);
+
+            var result = await command.ExecuteScalarAsync(ct);
+            return result is string text && !string.IsNullOrWhiteSpace(text);
+        }
+        finally
+        {
+            if (shouldClose)
+                await connection.CloseAsync();
+        }
     }
 }

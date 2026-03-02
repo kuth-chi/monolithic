@@ -69,6 +69,9 @@ public sealed class LicenseGuardService(
     public async Task<LicenseGuardResult> GetLocalStatusAsync(
         Guid ownerId, CancellationToken ct = default)
     {
+        if (!await TableExistsAsync("BusinessLicenses", ct))
+            return NoLicenseResult();
+
         var license = await FindActiveLicenseAsync(ownerId, ct);
         return BuildLocalResult(license, options);
     }
@@ -78,6 +81,9 @@ public sealed class LicenseGuardService(
     public async Task<LicenseGuardResult> ValidateRemoteAsync(
         Guid ownerId, CancellationToken ct = default)
     {
+        if (!await TableExistsAsync("BusinessLicenses", ct))
+            return NoLicenseResult();
+
         var license = await FindActiveLicenseAsync(ownerId, ct);
 
         // 1. Fetch remote mapping
@@ -174,14 +180,14 @@ public sealed class LicenseGuardService(
 
         // 7. Update remote-validation timestamp and sync quota
         license.LastRemoteValidatedAtUtc = DateTimeOffset.UtcNow;
-        license.ExpiresOn                = remote.ExpiresOn;
-        license.MaxBusinesses           = remote.MaxBusinesses;
-        license.MaxBranchesPerBusiness  = remote.MaxBranchesPerBusiness;
-        license.MaxEmployees            = remote.MaxEmployees;
-        license.AllowAdvancedReporting  = remote.AllowAdvancedReporting;
-        license.AllowMultiCurrency      = remote.AllowMultiCurrency;
-        license.AllowIntegrations       = remote.AllowIntegrations;
-        license.ModifiedAtUtc           = DateTimeOffset.UtcNow;
+        license.ExpiresOn = remote.ExpiresOn;
+        license.MaxBusinesses = remote.MaxBusinesses;
+        license.MaxBranchesPerBusiness = remote.MaxBranchesPerBusiness;
+        license.MaxEmployees = remote.MaxEmployees;
+        license.AllowAdvancedReporting = remote.AllowAdvancedReporting;
+        license.AllowMultiCurrency = remote.AllowMultiCurrency;
+        license.AllowIntegrations = remote.AllowIntegrations;
+        license.ModifiedAtUtc = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
 
         logger.LogInformation("[LicenseGuard] Remote validation OK for owner {OwnerId}.", ownerId);
@@ -192,6 +198,14 @@ public sealed class LicenseGuardService(
 
     public async Task SweepAllAsync(CancellationToken ct = default)
     {
+        if (!await TableExistsAsync("BusinessLicenses", ct))
+        {
+            logger.LogWarning(
+                "[LicenseGuard] Sweep skipped — table '{Table}' does not exist in current schema.",
+                "BusinessLicenses");
+            return;
+        }
+
         // Connectivity pre-check: abort early when offline so we don't log
         // thousands of spurious warnings on isolated networks.
         var mapping = await githubService.FetchAsync(ct);
@@ -233,6 +247,33 @@ public sealed class LicenseGuardService(
             .OrderByDescending(l => l.CreatedAtUtc)
             .FirstOrDefaultAsync(ct);
 
+    private async Task<bool> TableExistsAsync(string tableName, CancellationToken ct)
+    {
+        var connection = db.Database.GetDbConnection();
+        var shouldClose = connection.State != System.Data.ConnectionState.Open;
+        if (shouldClose)
+            await connection.OpenAsync(ct);
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT to_regclass(@schemaQualifiedName)::text;";
+
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = "@schemaQualifiedName";
+            parameter.Value = $"public.\"{tableName}\"";
+            command.Parameters.Add(parameter);
+
+            var result = await command.ExecuteScalarAsync(ct);
+            return result is string text && !string.IsNullOrWhiteSpace(text);
+        }
+        finally
+        {
+            if (shouldClose)
+                await connection.CloseAsync();
+        }
+    }
+
     private async Task RevokeLicenseAsync(
         BusinessLicense license, string reason, CancellationToken ct)
     {
@@ -255,8 +296,8 @@ public sealed class LicenseGuardService(
 
         license.TamperCount++;
         license.LastTamperDetectedAtUtc = DateTimeOffset.UtcNow;
-        license.TamperWarningMessage    = reason;
-        license.ModifiedAtUtc           = DateTimeOffset.UtcNow;
+        license.TamperWarningMessage = reason;
+        license.ModifiedAtUtc = DateTimeOffset.UtcNow;
 
         if (license.TamperCount >= maxStrikes)
         {
@@ -293,9 +334,9 @@ public sealed class LicenseGuardService(
 
         return BuildLocalResult(license, options) with
         {
-            Code                 = LicenseGuardCode.TamperWarning,
-            Message              = publicWarning,
-            TamperCount          = license.TamperCount,
+            Code = LicenseGuardCode.TamperWarning,
+            Message = publicWarning,
+            TamperCount = license.TamperCount,
             TamperWarningMessage = publicWarning,
         };
     }
@@ -308,9 +349,9 @@ public sealed class LicenseGuardService(
         var user = await db.Users.FindAsync([ownerId], ct);
         if (user is null) return;
 
-        user.IsActive         = false;
-        user.SuspendedAtUtc   = DateTimeOffset.UtcNow;
-        user.SuspendedReason  = reason;
+        user.IsActive = false;
+        user.SuspendedAtUtc = DateTimeOffset.UtcNow;
+        user.SuspendedReason = reason;
         await db.SaveChangesAsync(ct);
 
         logger.LogInformation(
@@ -341,16 +382,16 @@ public sealed class LicenseGuardService(
             if (days <= opts.ExpiryWarningDays)
             {
                 return new LicenseGuardResult(
-                    IsValid:                   true,
-                    Code:                      LicenseGuardCode.ExpiringSoon,
-                    Message:                   $"Your license expires in {days} day(s). Please renew soon.",
-                    Plan:                      license.Plan,
-                    ExpiresOn:                 license.ExpiresOn,
-                    DaysUntilExpiry:           days,
-                    IsExpiringSoon:            true,
-                    LastRemoteValidatedAtUtc:  license.LastRemoteValidatedAtUtc,
-                    TamperCount:               license.TamperCount,
-                    TamperWarningMessage:      license.TamperWarningMessage);
+                    IsValid: true,
+                    Code: LicenseGuardCode.ExpiringSoon,
+                    Message: $"Your license expires in {days} day(s). Please renew soon.",
+                    Plan: license.Plan,
+                    ExpiresOn: license.ExpiresOn,
+                    DaysUntilExpiry: days,
+                    IsExpiringSoon: true,
+                    LastRemoteValidatedAtUtc: license.LastRemoteValidatedAtUtc,
+                    TamperCount: license.TamperCount,
+                    TamperWarningMessage: license.TamperWarningMessage);
             }
         }
 
@@ -360,76 +401,76 @@ public sealed class LicenseGuardService(
             (DateTimeOffset.UtcNow - license.LastRemoteValidatedAtUtc.Value).TotalDays > opts.MaxValidationStaleDays)
         {
             return new LicenseGuardResult(
-                IsValid:                  true,   // still let through but surface the stale warning
-                Code:                     LicenseGuardCode.ValidationStale,
-                Message:                  $"Your license has not been remotely verified in over {opts.MaxValidationStaleDays} day(s). " +
+                IsValid: true,   // still let through but surface the stale warning
+                Code: LicenseGuardCode.ValidationStale,
+                Message: $"Your license has not been remotely verified in over {opts.MaxValidationStaleDays} day(s). " +
                                           "Please ensure your device can reach the license server.",
-                Plan:                     license.Plan,
-                ExpiresOn:                license.ExpiresOn,
-                DaysUntilExpiry:          license.ExpiresOn.HasValue
+                Plan: license.Plan,
+                ExpiresOn: license.ExpiresOn,
+                DaysUntilExpiry: license.ExpiresOn.HasValue
                                             ? license.ExpiresOn.Value.DayNumber - today.DayNumber
                                             : null,
-                IsExpiringSoon:           false,
+                IsExpiringSoon: false,
                 LastRemoteValidatedAtUtc: license.LastRemoteValidatedAtUtc,
-                TamperCount:              license.TamperCount,
-                TamperWarningMessage:     license.TamperWarningMessage);
+                TamperCount: license.TamperCount,
+                TamperWarningMessage: license.TamperWarningMessage);
         }
 
         return new LicenseGuardResult(
-            IsValid:                  true,
-            Code:                     license.TamperCount > 0 ? LicenseGuardCode.TamperWarning : LicenseGuardCode.Valid,
-            Message:                  license.TamperCount > 0
+            IsValid: true,
+            Code: license.TamperCount > 0 ? LicenseGuardCode.TamperWarning : LicenseGuardCode.Valid,
+            Message: license.TamperCount > 0
                                         ? license.TamperWarningMessage ?? "A license integrity issue was detected on your account."
                                         : "License is valid.",
-            Plan:                     license.Plan,
-            ExpiresOn:                license.ExpiresOn,
-            DaysUntilExpiry:          license.ExpiresOn.HasValue
+            Plan: license.Plan,
+            ExpiresOn: license.ExpiresOn,
+            DaysUntilExpiry: license.ExpiresOn.HasValue
                                         ? license.ExpiresOn.Value.DayNumber - today.DayNumber
                                         : null,
-            IsExpiringSoon:           false,
+            IsExpiringSoon: false,
             LastRemoteValidatedAtUtc: license.LastRemoteValidatedAtUtc,
-            TamperCount:              license.TamperCount,
-            TamperWarningMessage:     license.TamperWarningMessage);
+            TamperCount: license.TamperCount,
+            TamperWarningMessage: license.TamperWarningMessage);
     }
 
     private static LicenseGuardResult NoLicenseResult() => new(
-        IsValid:                  false,
-        Code:                     LicenseGuardCode.NoLicense,
-        Message:                  "No active license found. Please activate your license.",
-        Plan:                     null,
-        ExpiresOn:                null,
-        DaysUntilExpiry:          null,
-        IsExpiringSoon:           false,
+        IsValid: false,
+        Code: LicenseGuardCode.NoLicense,
+        Message: "No active license found. Please activate your license.",
+        Plan: null,
+        ExpiresOn: null,
+        DaysUntilExpiry: null,
+        IsExpiringSoon: false,
         LastRemoteValidatedAtUtc: null);
 
     private static LicenseGuardResult RevokedResult(string message) => new(
-        IsValid:                  false,
-        Code:                     LicenseGuardCode.Revoked,
-        Message:                  message,
-        Plan:                     null,
-        ExpiresOn:                null,
-        DaysUntilExpiry:          null,
-        IsExpiringSoon:           false,
+        IsValid: false,
+        Code: LicenseGuardCode.Revoked,
+        Message: message,
+        Plan: null,
+        ExpiresOn: null,
+        DaysUntilExpiry: null,
+        IsExpiringSoon: false,
         LastRemoteValidatedAtUtc: null);
 
     private static LicenseGuardResult ExpiredResult(DateOnly expiredOn) => new(
-        IsValid:                  false,
-        Code:                     LicenseGuardCode.Expired,
-        Message:                  $"Your license expired on {expiredOn:yyyy-MM-dd}. Please contact support to renew.",
-        Plan:                     null,
-        ExpiresOn:                expiredOn,
-        DaysUntilExpiry:          0,
-        IsExpiringSoon:           false,
+        IsValid: false,
+        Code: LicenseGuardCode.Expired,
+        Message: $"Your license expired on {expiredOn:yyyy-MM-dd}. Please contact support to renew.",
+        Plan: null,
+        ExpiresOn: expiredOn,
+        DaysUntilExpiry: 0,
+        IsExpiringSoon: false,
         LastRemoteValidatedAtUtc: null);
 
     private static LicenseGuardResult SuspendedResult(string message) => new(
-        IsValid:                  false,
-        Code:                     LicenseGuardCode.AccountSuspended,
-        Message:                  message,
-        Plan:                     null,
-        ExpiresOn:                null,
-        DaysUntilExpiry:          null,
-        IsExpiringSoon:           false,
+        IsValid: false,
+        Code: LicenseGuardCode.AccountSuspended,
+        Message: message,
+        Plan: null,
+        ExpiresOn: null,
+        DaysUntilExpiry: null,
+        IsExpiringSoon: false,
         LastRemoteValidatedAtUtc: null);
 
     /// <summary>
@@ -437,7 +478,7 @@ public sealed class LicenseGuardService(
     /// </summary>
     internal static string ComputeHash(string licenseKey, Guid ownerId, DateOnly startsOn)
     {
-        var raw  = $"{licenseKey}|{ownerId:N}|{startsOn:yyyy-MM-dd}";
+        var raw = $"{licenseKey}|{ownerId:N}|{startsOn:yyyy-MM-dd}";
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(raw));
         return Convert.ToHexStringLower(hash);
     }

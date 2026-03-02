@@ -1,6 +1,6 @@
 services:
   api:
-    image: kuthchi/monolithic-api:0.7.9
+    image: kuthchi/monolithic-api:latest
     container_name: monolithic-api
     restart: unless-stopped
     ports:

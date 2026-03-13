@@ -292,6 +292,7 @@ public sealed class AuthService : IAuthService
         {
             Id = Guid.NewGuid(),
             Name = roleName,
+            NormalizedName = roleName.ToUpperInvariant(),
             Description = description,
             IsSystemRole = true,
         });

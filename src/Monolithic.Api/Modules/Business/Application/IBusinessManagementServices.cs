@@ -82,6 +82,24 @@ public interface IBusinessBranchService
 }
 
 /// <summary>
+/// Reads employee directory data for a specific business.
+/// </summary>
+public interface IBusinessEmployeeService
+{
+    /// <summary>Returns a paginated, filtered, and sorted employee list for the given business.</summary>
+    Task<PagedResult<BusinessEmployeeDto>> GetByBusinessAsync(
+        Guid businessId,
+        BusinessEmployeeQueryParameters query,
+        CancellationToken ct = default);
+
+    /// <summary>Creates a new employee account in the given business and optionally assigns a primary branch.</summary>
+    Task<BusinessEmployeeDto> CreateAsync(
+        Guid businessId,
+        CreateBusinessEmployeeRequest request,
+        CancellationToken ct = default);
+}
+
+/// <summary>
 /// Manages per-business configurable settings.
 /// </summary>
 public interface IBusinessSettingService

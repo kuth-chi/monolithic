@@ -34,6 +34,7 @@ public static class BusinessModuleRegistration
         services.AddScoped<IBusinessLicenseService, BusinessLicenseService>();
         services.AddScoped<IBusinessOwnershipService, BusinessOwnershipService>();
         services.AddScoped<IBusinessBranchService, BusinessBranchService>();
+        services.AddScoped<IBusinessEmployeeService, BusinessEmployeeService>();
         services.AddScoped<IBusinessSettingService, BusinessSettingService>();
         services.AddScoped<IBusinessMediaService, BusinessMediaService>();
         services.AddScoped<IBusinessHolidayService, BusinessHolidayService>();

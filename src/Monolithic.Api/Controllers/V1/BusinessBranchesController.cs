@@ -77,7 +77,12 @@ public sealed class BusinessBranchesController(
     [HttpPut("{branchId:guid}")]
     [RequirePermission("business:write")]
     public async Task<IActionResult> Update(Guid businessId, Guid branchId, [FromBody] UpdateBranchRequest request, CancellationToken ct)
-        => Ok(await branchService.UpdateAsync(branchId, request, ct));
+    {
+        var existing = await branchService.GetByIdAsync(branchId, ct);
+        if (existing is null || existing.BusinessId != businessId) return NotFound();
+
+        return Ok(await branchService.UpdateAsync(branchId, request, ct));
+    }
 
     /// <summary>
     /// Promotes a branch to Headquarters and demotes the current HQ atomically.
@@ -94,6 +99,9 @@ public sealed class BusinessBranchesController(
     [RequirePermission("business:write")]
     public async Task<IActionResult> Delete(Guid businessId, Guid branchId, CancellationToken ct)
     {
+        var existing = await branchService.GetByIdAsync(branchId, ct);
+        if (existing is null || existing.BusinessId != businessId) return NotFound();
+
         await branchService.DeleteAsync(branchId, ct);
         return NoContent();
     }
@@ -119,6 +127,9 @@ public sealed class BusinessBranchesController(
         [FromQuery] BranchEmployeeQueryParameters query,
         CancellationToken ct)
     {
+        var existing = await branchService.GetByIdAsync(branchId, ct);
+        if (existing is null || existing.BusinessId != businessId) return NotFound();
+
         var result = await branchService.GetEmployeesAsync(branchId, query, ct);
         return Ok(result.WithNavigationUrls(Request));
     }
@@ -127,6 +138,9 @@ public sealed class BusinessBranchesController(
     [RequirePermission("business:write")]
     public async Task<IActionResult> AssignEmployee(Guid businessId, Guid branchId, [FromBody] AssignEmployeeToBranchRequest request, CancellationToken ct)
     {
+        var existing = await branchService.GetByIdAsync(branchId, ct);
+        if (existing is null || existing.BusinessId != businessId) return NotFound();
+
         var result = await branchService.AssignEmployeeAsync(branchId, request, ct);
         return Ok(result);
     }
@@ -135,6 +149,9 @@ public sealed class BusinessBranchesController(
     [RequirePermission("business:write")]
     public async Task<IActionResult> ReleaseEmployee(Guid businessId, Guid branchId, Guid employeeId, CancellationToken ct)
     {
+        var existing = await branchService.GetByIdAsync(branchId, ct);
+        if (existing is null || existing.BusinessId != businessId) return NotFound();
+
         await branchService.ReleaseEmployeeAsync(branchId, employeeId, ct);
         return NoContent();
     }

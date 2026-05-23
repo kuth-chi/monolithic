@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Monolithic.Api.Common.Caching;
 using Monolithic.Api.Common.Errors;
@@ -147,16 +148,17 @@ public sealed class BusinessLicenseService(ApplicationDbContext db) : IBusinessL
 public sealed class BusinessOwnershipService(
     ApplicationDbContext db,
     IBusinessLicenseService licenseService,
-    IChartOfAccountService coaService) : IBusinessOwnershipService
+    IChartOfAccountService coaService,
+    UserManager<ApplicationUser> userManager) : IBusinessOwnershipService
 {
     private async Task<Domain.Business> GetOwnedBusinessEntityAsync(
         Guid ownerId,
         Guid businessId,
         CancellationToken ct)
     {
-        var business = await db.BusinessOwnerships
-            .Where(o => o.OwnerId == ownerId && o.BusinessId == businessId && o.RevokedAtUtc == null)
-            .Select(o => o.Business)
+        var business = await db.Businesses
+            .Where(b => b.Id == businessId)
+            .Where(b => b.Ownerships.Any(o => o.OwnerId == ownerId && o.RevokedAtUtc == null))
             .Include(b => b.Employees)
             .Include(b => b.Media.Where(m => m.IsCurrent))
             .FirstOrDefaultAsync(ct);
@@ -369,12 +371,142 @@ public sealed class BusinessOwnershipService(
 
         await db.SaveChangesAsync(ct);
 
-        // 6. Seed standard chart of accounts (after save so BusinessId FK is valid)
+        // 6. Ensure the creator is represented in this business as owner employee
+        //    and is assigned to the HQ branch.
+        await EnsureOwnerEmployeeEnrollmentAsync(ownerId, business, hq, ct);
+
+        // 7. Seed standard chart of accounts (after save so BusinessId FK is valid)
         await coaService.SeedStandardCOAAsync(business.Id, req.BaseCurrencyCode, ct);
 
         return new BusinessOwnershipDto(
             ownership.Id, ownerId, business.Id, business.Name,
             license.Id, true, ownership.GrantedAtUtc, true);
+    }
+
+    private async Task EnsureOwnerEmployeeEnrollmentAsync(
+        Guid ownerId,
+        Domain.Business business,
+        BusinessBranch headquarters,
+        CancellationToken ct)
+    {
+        var ownerUser = await db.Users.FirstOrDefaultAsync(u => u.Id == ownerId, ct)
+            ?? throw new KeyNotFoundException("Owner account not found.");
+
+        await EnsureOwnerRoleAsync(ownerUser);
+
+        var existingOwnerEmployee = await db.Employees
+            .FirstOrDefaultAsync(e => e.Id == ownerId, ct);
+
+        var now = DateTimeOffset.UtcNow;
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+
+        Guid ownerEmployeeId;
+
+        if (existingOwnerEmployee is null)
+        {
+            var employeeNumber = BuildOwnerEmployeeNumber(business.Id);
+
+            // Promote the creator account from ApplicationUser to Employee in-place.
+            // This keeps identity continuity (same user ID) while onboarding workforce data.
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $@"UPDATE ""AspNetUsers""
+                   SET ""UserType"" = 'Employee',
+                       ""BusinessId"" = {business.Id},
+                       ""EmployeeNumber"" = {employeeNumber},
+                       ""Employee_JobTitle"" = {"Owner"},
+                       ""Department"" = {"Management"},
+                       ""Status"" = {"Active"},
+                       ""HiredAtUtc"" = {now},
+                       ""TerminatedAtUtc"" = NULL
+                 WHERE ""Id"" = {ownerId};",
+                ct);
+
+            ownerEmployeeId = ownerId;
+        }
+        else if (existingOwnerEmployee.BusinessId == business.Id)
+        {
+            ownerEmployeeId = existingOwnerEmployee.Id;
+        }
+        else
+        {
+            // The creator is already an employee in a different business.
+            // Create a mirrored owner employee profile for this business.
+            var mirror = new Employee
+            {
+                Id = Guid.NewGuid(),
+                UserName = BuildMirrorOwnerUserName(ownerUser, business.Id),
+                NormalizedUserName = BuildMirrorOwnerUserName(ownerUser, business.Id).ToUpperInvariant(),
+                Email = ownerUser.Email,
+                NormalizedEmail = ownerUser.NormalizedEmail,
+                EmailConfirmed = ownerUser.EmailConfirmed,
+                PhoneNumber = ownerUser.PhoneNumber,
+                PhoneNumberConfirmed = ownerUser.PhoneNumberConfirmed,
+                FullName = ownerUser.FullName,
+                IsActive = ownerUser.IsActive,
+                CreatedAtUtc = now,
+                BusinessId = business.Id,
+                EmployeeNumber = BuildOwnerEmployeeNumber(business.Id),
+                JobTitle = "Owner",
+                Department = "Management",
+                Status = "Active",
+                HiredAtUtc = now,
+                SecurityStamp = Guid.NewGuid().ToString("N"),
+                ConcurrencyStamp = Guid.NewGuid().ToString("N")
+            };
+
+            db.Employees.Add(mirror);
+            ownerEmployeeId = mirror.Id;
+        }
+
+        business.OwnerEmployeeId = ownerEmployeeId;
+
+        var hasHqAssignment = await db.BranchEmployees
+            .AnyAsync(be =>
+                be.BranchId == headquarters.Id
+                && be.EmployeeId == ownerEmployeeId
+                && be.ReleasedOn == null,
+                ct);
+
+        if (!hasHqAssignment)
+        {
+            db.BranchEmployees.Add(new BranchEmployee
+            {
+                Id = Guid.NewGuid(),
+                BranchId = headquarters.Id,
+                EmployeeId = ownerEmployeeId,
+                IsPrimary = true,
+                AssignedOn = today,
+                ReleasedOn = null
+            });
+        }
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    private async Task EnsureOwnerRoleAsync(ApplicationUser ownerUser)
+    {
+        if (await userManager.IsInRoleAsync(ownerUser, SystemRoleNames.Owner))
+            return;
+
+        var result = await userManager.AddToRoleAsync(ownerUser, SystemRoleNames.Owner);
+        if (!result.Succeeded)
+        {
+            var errors = string.Join("; ", result.Errors.Select(e => e.Description));
+            throw new InvalidOperationException($"Failed to assign owner role: {errors}");
+        }
+    }
+
+    private static string BuildOwnerEmployeeNumber(Guid businessId)
+        => $"OWN-{businessId.ToString("N")[..10].ToUpperInvariant()}";
+
+    private static string BuildMirrorOwnerUserName(ApplicationUser ownerUser, Guid businessId)
+    {
+        var emailPrefix = ownerUser.Email?.Split('@')[0];
+        var baseName = string.IsNullOrWhiteSpace(emailPrefix)
+            ? "owner"
+            : emailPrefix.Trim().ToLowerInvariant();
+
+        return $"{baseName}+owner-{businessId.ToString("N")[..8]}";
     }
 
     public async Task<OwnerBusinessDetailDto> UpdateOwnedBusinessAsync(
@@ -719,6 +851,285 @@ public sealed class BusinessBranchService(
 }
 
 // ── BusinessSettingService ────────────────────────────────────────────────────
+
+public sealed class BusinessEmployeeService(
+    ApplicationDbContext db,
+    UserManager<ApplicationUser> userManager,
+    RoleManager<ApplicationRole> roleManager) : IBusinessEmployeeService
+{
+    public async Task<PagedResult<BusinessEmployeeDto>> GetByBusinessAsync(
+        Guid businessId,
+        BusinessEmployeeQueryParameters query,
+        CancellationToken ct = default)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        IQueryable<Employee> employees = db.Employees
+            .AsNoTracking()
+            .Where(e => e.BusinessId == businessId && !e.IsDeleted);
+
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var search = query.Search.Trim().ToLower();
+            employees = employees.Where(e =>
+                e.FullName.ToLower().Contains(search)
+                || (e.Email != null && e.Email.ToLower().Contains(search))
+                || e.EmployeeNumber.ToLower().Contains(search)
+                || e.JobTitle.ToLower().Contains(search)
+                || e.Department.ToLower().Contains(search));
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Status))
+        {
+            var status = query.Status.Trim().ToLower();
+            employees = employees.Where(e => e.Status.ToLower() == status);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Department))
+        {
+            var department = query.Department.Trim().ToLower();
+            employees = employees.Where(e => e.Department.ToLower().Contains(department));
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.JobTitle))
+        {
+            var jobTitle = query.JobTitle.Trim().ToLower();
+            employees = employees.Where(e => e.JobTitle.ToLower().Contains(jobTitle));
+        }
+
+        if (query.IsActive.HasValue)
+            employees = employees.Where(e => e.IsActive == query.IsActive.Value);
+
+        if (query.BranchId.HasValue)
+        {
+            var branchId = query.BranchId.Value;
+            employees = employees.Where(e =>
+                db.BranchEmployees.Any(be =>
+                    be.EmployeeId == e.Id
+                    && be.BranchId == branchId
+                    && (be.ReleasedOn == null || be.ReleasedOn >= today)));
+        }
+
+        employees = query.SortBy?.ToLowerInvariant() switch
+        {
+            "email" => query.SortDesc ? employees.OrderByDescending(e => e.Email) : employees.OrderBy(e => e.Email),
+            "employeenumber" => query.SortDesc ? employees.OrderByDescending(e => e.EmployeeNumber) : employees.OrderBy(e => e.EmployeeNumber),
+            "department" => query.SortDesc ? employees.OrderByDescending(e => e.Department) : employees.OrderBy(e => e.Department),
+            "jobtitle" => query.SortDesc ? employees.OrderByDescending(e => e.JobTitle) : employees.OrderBy(e => e.JobTitle),
+            "status" => query.SortDesc ? employees.OrderByDescending(e => e.Status) : employees.OrderBy(e => e.Status),
+            "hiredatutc" => query.SortDesc ? employees.OrderByDescending(e => e.HiredAtUtc) : employees.OrderBy(e => e.HiredAtUtc),
+            _ => query.SortDesc ? employees.OrderByDescending(e => e.FullName) : employees.OrderBy(e => e.FullName)
+        };
+
+        var results = employees.Select(e => new BusinessEmployeeDto(
+            e.Id,
+            businessId,
+            e.FullName,
+            e.Email ?? string.Empty,
+            e.PhoneNumber,
+            e.EmployeeNumber,
+            e.JobTitle,
+            e.Department,
+            e.Status,
+            e.HiredAtUtc,
+            e.TerminatedAtUtc,
+            e.IsActive,
+            db.BranchEmployees
+                .Where(be =>
+                    be.EmployeeId == e.Id
+                    && (be.ReleasedOn == null || be.ReleasedOn >= today))
+                .OrderByDescending(be => be.IsPrimary)
+                .ThenBy(be => be.AssignedOn)
+                .Select(be => (Guid?)be.BranchId)
+                .FirstOrDefault(),
+            db.BranchEmployees
+                .Where(be =>
+                    be.EmployeeId == e.Id
+                    && (be.ReleasedOn == null || be.ReleasedOn >= today))
+                .OrderByDescending(be => be.IsPrimary)
+                .ThenBy(be => be.AssignedOn)
+                .Select(be => be.Branch.Name)
+                .FirstOrDefault(),
+            db.BranchEmployees.Count(be =>
+                be.EmployeeId == e.Id
+                && (be.ReleasedOn == null || be.ReleasedOn >= today))
+        ));
+
+        return await results.ToPagedResultAsync(query, ct);
+    }
+
+    public async Task<BusinessEmployeeDto> CreateAsync(
+        Guid businessId,
+        CreateBusinessEmployeeRequest request,
+        CancellationToken ct = default)
+    {
+        var business = await db.Businesses
+            .FirstOrDefaultAsync(b => b.Id == businessId, ct)
+            ?? throw new KeyNotFoundException("Business not found.");
+
+        var email = request.Email.Trim().ToLowerInvariant();
+        var fullName = request.FullName.Trim();
+        var roleName = request.RoleName.Trim();
+
+        if (string.IsNullOrWhiteSpace(email))
+            throw new InvalidOperationException("Email is required.");
+
+        if (string.IsNullOrWhiteSpace(fullName))
+            throw new InvalidOperationException("Full name is required.");
+
+        if (string.IsNullOrWhiteSpace(roleName))
+            throw new InvalidOperationException("Role is required.");
+
+        var role = await roleManager.FindByNameAsync(roleName)
+            ?? throw new KeyNotFoundException($"Role '{roleName}' was not found.");
+
+        var existingByEmail = await userManager.FindByEmailAsync(email);
+        if (existingByEmail is not null)
+            throw new InvalidOperationException("A user with this email already exists.");
+
+        var hiredAt = request.HiredAtUtc ?? DateTimeOffset.UtcNow;
+        var employeeNumber = await GenerateNextEmployeeNumberAsync(businessId, ct);
+
+        var employee = new Employee
+        {
+            Id = Guid.NewGuid(),
+            UserName = email,
+            Email = email,
+            FullName = fullName,
+            PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber)
+                ? null
+                : request.PhoneNumber.Trim(),
+            IsActive = request.IsActive,
+            BusinessId = businessId,
+            EmployeeNumber = employeeNumber,
+            JobTitle = string.IsNullOrWhiteSpace(request.JobTitle)
+                ? "Staff"
+                : request.JobTitle.Trim(),
+            Department = string.IsNullOrWhiteSpace(request.Department)
+                ? "General"
+                : request.Department.Trim(),
+            Status = string.IsNullOrWhiteSpace(request.Status)
+                ? "Active"
+                : request.Status.Trim(),
+            HiredAtUtc = hiredAt,
+            TerminatedAtUtc = null,
+        };
+
+        var initialPassword = string.IsNullOrWhiteSpace(request.InitialPassword)
+            ? "TempPassword123!"
+            : request.InitialPassword;
+
+        var createResult = await userManager.CreateAsync(employee, initialPassword);
+        if (!createResult.Succeeded)
+        {
+            var errors = string.Join("; ", createResult.Errors.Select(e => e.Description));
+            throw new InvalidOperationException($"Failed to create employee account: {errors}");
+        }
+
+        var roleResult = await userManager.AddToRoleAsync(employee, role.Name!);
+        if (!roleResult.Succeeded)
+        {
+            var errors = string.Join("; ", roleResult.Errors.Select(e => e.Description));
+            throw new InvalidOperationException($"Failed to assign role: {errors}");
+        }
+
+        db.UserBusinesses.Add(new UserBusiness
+        {
+            Id = Guid.NewGuid(),
+            UserId = employee.Id,
+            BusinessId = businessId,
+            IsDefault = true,
+            IsActive = true,
+            JoinedAtUtc = DateTimeOffset.UtcNow
+        });
+
+        var branchId = request.PrimaryBranchId;
+        if (!branchId.HasValue)
+        {
+            branchId = await db.BusinessBranches
+                .Where(b => b.BusinessId == businessId && b.IsHeadquarters && b.IsActive)
+                .Select(b => (Guid?)b.Id)
+                .FirstOrDefaultAsync(ct);
+        }
+
+        if (branchId.HasValue)
+        {
+            var branchExists = await db.BusinessBranches
+                .AnyAsync(b => b.Id == branchId.Value && b.BusinessId == businessId, ct);
+
+            if (!branchExists)
+                throw new InvalidOperationException("Primary branch does not belong to this business.");
+
+            db.BranchEmployees.Add(new BranchEmployee
+            {
+                Id = Guid.NewGuid(),
+                BranchId = branchId.Value,
+                EmployeeId = employee.Id,
+                IsPrimary = true,
+                AssignedOn = DateOnly.FromDateTime(hiredAt.UtcDateTime),
+                ReleasedOn = null
+            });
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var created = await db.Employees
+            .AsNoTracking()
+            .Where(e => e.Id == employee.Id)
+            .Select(e => new BusinessEmployeeDto(
+                e.Id,
+                businessId,
+                e.FullName,
+                e.Email ?? string.Empty,
+                e.PhoneNumber,
+                e.EmployeeNumber,
+                e.JobTitle,
+                e.Department,
+                e.Status,
+                e.HiredAtUtc,
+                e.TerminatedAtUtc,
+                e.IsActive,
+                db.BranchEmployees
+                    .Where(be =>
+                        be.EmployeeId == e.Id
+                        && (be.ReleasedOn == null || be.ReleasedOn >= today))
+                    .OrderByDescending(be => be.IsPrimary)
+                    .ThenBy(be => be.AssignedOn)
+                    .Select(be => (Guid?)be.BranchId)
+                    .FirstOrDefault(),
+                db.BranchEmployees
+                    .Where(be =>
+                        be.EmployeeId == e.Id
+                        && (be.ReleasedOn == null || be.ReleasedOn >= today))
+                    .OrderByDescending(be => be.IsPrimary)
+                    .ThenBy(be => be.AssignedOn)
+                    .Select(be => be.Branch.Name)
+                    .FirstOrDefault(),
+                db.BranchEmployees.Count(be =>
+                    be.EmployeeId == e.Id
+                    && (be.ReleasedOn == null || be.ReleasedOn >= today))
+            ))
+            .FirstAsync(ct);
+
+        return created;
+    }
+
+    private async Task<string> GenerateNextEmployeeNumberAsync(Guid businessId, CancellationToken ct)
+    {
+        for (var i = 1; i <= 999999; i++)
+        {
+            var candidate = $"EMP-{i:D6}";
+            var exists = await db.Employees
+                .AnyAsync(e => e.BusinessId == businessId && e.EmployeeNumber == candidate, ct);
+
+            if (!exists)
+                return candidate;
+        }
+
+        throw new InvalidOperationException("Unable to generate employee number.");
+    }
+}
 
 public sealed class BusinessSettingService(ApplicationDbContext db) : IBusinessSettingService
 {

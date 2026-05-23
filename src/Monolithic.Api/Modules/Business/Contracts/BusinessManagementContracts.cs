@@ -47,6 +47,38 @@ public sealed record BranchEmployeeQueryParameters : QueryParameters
 }
 
 /// <summary>
+/// URL query parameters for the GET /businesses/{businessId}/employees list endpoint.
+/// </summary>
+public sealed record BusinessEmployeeQueryParameters : QueryParameters
+{
+    /// <summary>Exact-match filter by employee status (Active, Inactive, OnLeave, ...).</summary>
+    public string? Status { get; init; }
+
+    /// <summary>Case-insensitive substring filter on employee department.</summary>
+    public string? Department { get; init; }
+
+    /// <summary>Case-insensitive substring filter on employee job title.</summary>
+    public string? JobTitle { get; init; }
+
+    /// <summary>When set, include only users with matching account active flag.</summary>
+    public bool? IsActive { get; init; }
+
+    /// <summary>
+    /// Optional filter by current active branch assignment. Uses active assignments only.
+    /// </summary>
+    public Guid? BranchId { get; init; }
+
+    /// <inheritdoc/>
+    public override string ToCacheSegment() =>
+        $"{base.ToCacheSegment()}" +
+        $":st{Status?.ToLowerInvariant() ?? ""}" +
+        $":dp{Department?.ToLowerInvariant() ?? ""}" +
+        $":jt{JobTitle?.ToLowerInvariant() ?? ""}" +
+        $":ia{IsActive}" +
+        $":br{BranchId}";
+}
+
+/// <summary>
 /// Combined request to create a new business + assign ownership in one call.
 /// Automatically creates default HQ branch, settings, and standard COA.
 /// </summary>
@@ -225,6 +257,36 @@ public sealed record BranchEmployeeDto(
     DateOnly AssignedOn,
     DateOnly? ReleasedOn,
     bool IsActive);
+
+public sealed record BusinessEmployeeDto(
+    Guid EmployeeId,
+    Guid BusinessId,
+    string FullName,
+    string Email,
+    string? PhoneNumber,
+    string EmployeeNumber,
+    string JobTitle,
+    string Department,
+    string Status,
+    DateTimeOffset HiredAtUtc,
+    DateTimeOffset? TerminatedAtUtc,
+    bool IsActive,
+    Guid? PrimaryBranchId,
+    string? PrimaryBranchName,
+    int ActiveBranchAssignments);
+
+public sealed record CreateBusinessEmployeeRequest(
+    string FullName,
+    string Email,
+    string? PhoneNumber,
+    string JobTitle,
+    string Department,
+    string Status,
+    string RoleName,
+    Guid? PrimaryBranchId,
+    string? InitialPassword,
+    bool IsActive = true,
+    DateTimeOffset? HiredAtUtc = null);
 
 public sealed record AssignEmployeeToBranchRequest(
     Guid EmployeeId,

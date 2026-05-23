@@ -1,10 +1,47 @@
 using Microsoft.AspNetCore.Mvc;
+using Monolithic.Api.Common.Pagination;
 using Monolithic.Api.Modules.Identity.Authorization;
 using Monolithic.Api.Modules.Business.Application;
 using Monolithic.Api.Modules.Business.Contracts;
 using Monolithic.Api.Modules.Business.Domain;
 
 namespace Monolithic.Api.Controllers.V1;
+
+/// <summary>
+/// Business-level employee directory endpoint.
+/// </summary>
+[ApiController]
+[Route("api/v1/businesses/{businessId:guid}/employees")]
+public sealed class BusinessEmployeesController(IBusinessEmployeeService employeeService) : ControllerBase
+{
+    /// <summary>
+    /// Returns a paginated, searchable, and sortable employee list for the business.
+    /// </summary>
+    [HttpGet]
+    [RequirePermission("business:read")]
+    public async Task<IActionResult> GetAll(
+        Guid businessId,
+        [FromQuery] BusinessEmployeeQueryParameters query,
+        CancellationToken ct)
+    {
+        var result = await employeeService.GetByBusinessAsync(businessId, query, ct);
+        return Ok(result.WithNavigationUrls(Request));
+    }
+
+    /// <summary>
+    /// Creates an employee account under the given business and returns the employee directory row.
+    /// </summary>
+    [HttpPost]
+    [RequirePermission("business:write")]
+    public async Task<IActionResult> Create(
+        Guid businessId,
+        [FromBody] CreateBusinessEmployeeRequest request,
+        CancellationToken ct)
+    {
+        var created = await employeeService.CreateAsync(businessId, request, ct);
+        return Ok(created);
+    }
+}
 
 /// <summary>
 /// Business settings: primary color, timezone, currency, calendar, attendance defaults.

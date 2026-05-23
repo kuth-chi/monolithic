@@ -149,6 +149,46 @@ public sealed class BusinessOwnershipService(
     IBusinessLicenseService licenseService,
     IChartOfAccountService coaService) : IBusinessOwnershipService
 {
+    private async Task<Domain.Business> GetOwnedBusinessEntityAsync(
+        Guid ownerId,
+        Guid businessId,
+        CancellationToken ct)
+    {
+        var business = await db.BusinessOwnerships
+            .Where(o => o.OwnerId == ownerId && o.BusinessId == businessId && o.RevokedAtUtc == null)
+            .Select(o => o.Business)
+            .Include(b => b.Employees)
+            .Include(b => b.Media.Where(m => m.IsCurrent))
+            .FirstOrDefaultAsync(ct);
+
+        return business ?? throw new KeyNotFoundException("Business not found.");
+    }
+
+    private static OwnerBusinessDetailDto ToOwnerBusinessDetailDto(Domain.Business b)
+    {
+        var logo = b.Media.FirstOrDefault(m => m.MediaType == BusinessMediaType.Logo)?.PublicUrl;
+        return new OwnerBusinessDetailDto(
+            b.Id,
+            b.Name,
+            b.ShortName,
+            b.Code,
+            b.ShortDescription,
+            b.Description,
+            b.LocalName,
+            b.VatTin,
+            b.BaseCurrencyCode,
+            b.Address,
+            b.City,
+            b.StateProvince,
+            b.Country,
+            b.PostalCode,
+            b.Employees.Count,
+            b.IsActive,
+            logo,
+            b.CreatedAtUtc,
+            b.ModifiedAtUtc);
+    }
+
     public async Task<OwnerDashboardDto> GetOwnerDashboardAsync(Guid ownerId, CancellationToken ct = default)
     {
         var license = await licenseService.GetByOwnerAsync(ownerId, ct);
@@ -197,6 +237,15 @@ public sealed class BusinessOwnershipService(
             .ToListAsync(ct);
     }
 
+    public async Task<OwnerBusinessDetailDto> GetOwnedBusinessByIdAsync(
+        Guid ownerId,
+        Guid businessId,
+        CancellationToken ct = default)
+    {
+        var business = await GetOwnedBusinessEntityAsync(ownerId, businessId, ct);
+        return ToOwnerBusinessDetailDto(business);
+    }
+
     public async Task<BusinessOwnershipDto> CreateBusinessAsync(
         Guid ownerId,
         CreateBusinessWithOwnerRequest req,
@@ -219,13 +268,13 @@ public sealed class BusinessOwnershipService(
             // The entire unit-of-work (license + business + branch + …) saves atomically below.
             license = new BusinessLicense
             {
-                Id       = Guid.NewGuid(),
-                OwnerId  = ownerId,
-                Plan     = LicensePlan.Free,
-                Status   = LicenseStatus.Active,
-                MaxBusinesses          = 1,
+                Id = Guid.NewGuid(),
+                OwnerId = ownerId,
+                Plan = LicensePlan.Free,
+                Status = LicenseStatus.Active,
+                MaxBusinesses = 1,
                 MaxBranchesPerBusiness = 3,
-                MaxEmployees           = 10,
+                MaxEmployees = 10,
                 StartsOn = DateOnly.FromDateTime(DateTime.UtcNow),
             };
             db.BusinessLicenses.Add(license);
@@ -328,6 +377,33 @@ public sealed class BusinessOwnershipService(
             license.Id, true, ownership.GrantedAtUtc, true);
     }
 
+    public async Task<OwnerBusinessDetailDto> UpdateOwnedBusinessAsync(
+        Guid ownerId,
+        Guid businessId,
+        UpdateOwnedBusinessRequest req,
+        CancellationToken ct = default)
+    {
+        var business = await GetOwnedBusinessEntityAsync(ownerId, businessId, ct);
+
+        business.Name = req.Name.Trim();
+        business.ShortName = string.IsNullOrWhiteSpace(req.ShortName) ? null : req.ShortName.Trim();
+        business.Code = string.IsNullOrWhiteSpace(req.Code) ? null : req.Code.Trim();
+        business.ShortDescription = string.IsNullOrWhiteSpace(req.ShortDescription) ? null : req.ShortDescription.Trim();
+        business.Description = string.IsNullOrWhiteSpace(req.Description) ? null : req.Description.Trim();
+        business.LocalName = req.LocalName.Trim();
+        business.VatTin = req.VatTin.Trim();
+        business.BaseCurrencyCode = req.BaseCurrencyCode.Trim().ToUpperInvariant();
+        business.Address = req.Address.Trim();
+        business.City = req.City.Trim();
+        business.StateProvince = req.StateProvince.Trim();
+        business.Country = req.Country.Trim();
+        business.PostalCode = req.PostalCode.Trim();
+        business.ModifiedAtUtc = DateTimeOffset.UtcNow;
+
+        await db.SaveChangesAsync(ct);
+        return ToOwnerBusinessDetailDto(business);
+    }
+
     public async Task RevokeOwnershipAsync(Guid ownerId, Guid businessId, CancellationToken ct = default)
     {
         var ownership = await db.BusinessOwnerships
@@ -398,13 +474,13 @@ public sealed class BusinessBranchService(
                 // ─ Sorting ──────────────────────────────────────────────────
                 q = query.SortBy?.ToLowerInvariant() switch
                 {
-                    "name"      => query.SortDesc ? q.OrderByDescending(b => b.Name)         : q.OrderBy(b => b.Name),
-                    "code"      => query.SortDesc ? q.OrderByDescending(b => b.Code)         : q.OrderBy(b => b.Code),
-                    "city"      => query.SortDesc ? q.OrderByDescending(b => b.City)         : q.OrderBy(b => b.City),
-                    "country"   => query.SortDesc ? q.OrderByDescending(b => b.Country)      : q.OrderBy(b => b.Country),
+                    "name" => query.SortDesc ? q.OrderByDescending(b => b.Name) : q.OrderBy(b => b.Name),
+                    "code" => query.SortDesc ? q.OrderByDescending(b => b.Code) : q.OrderBy(b => b.Code),
+                    "city" => query.SortDesc ? q.OrderByDescending(b => b.City) : q.OrderBy(b => b.City),
+                    "country" => query.SortDesc ? q.OrderByDescending(b => b.Country) : q.OrderBy(b => b.Country),
                     "createdat" => query.SortDesc ? q.OrderByDescending(b => b.CreatedAtUtc) : q.OrderBy(b => b.CreatedAtUtc),
-                    "sortorder" => query.SortDesc ? q.OrderByDescending(b => b.SortOrder)    : q.OrderBy(b => b.SortOrder),
-                    _           => q.OrderBy(b => b.SortOrder).ThenBy(b => b.Name)
+                    "sortorder" => query.SortDesc ? q.OrderByDescending(b => b.SortOrder) : q.OrderBy(b => b.SortOrder),
+                    _ => q.OrderBy(b => b.SortOrder).ThenBy(b => b.Name)
                 };
 
                 return await q.Select(b => b.ToDto()).ToPagedResultAsync(query, innerCt);
@@ -447,22 +523,22 @@ public sealed class BusinessBranchService(
 
         var branch = new BusinessBranch
         {
-            Id             = Guid.NewGuid(),
-            BusinessId     = req.BusinessId,
-            Code           = req.Code,
-            Name           = req.Name,
-            Type           = req.Type,
+            Id = Guid.NewGuid(),
+            BusinessId = req.BusinessId,
+            Code = req.Code,
+            Name = req.Name,
+            Type = req.Type,
             IsHeadquarters = req.IsHeadquarters,
-            Address        = req.Address,
-            City           = req.City,
-            StateProvince  = req.StateProvince,
-            Country        = req.Country,
-            PostalCode     = req.PostalCode,
-            PhoneNumber    = req.PhoneNumber,
-            Email          = req.Email,
-            TimezoneId     = req.TimezoneId,
-            ManagerId      = req.ManagerId,
-            SortOrder      = req.SortOrder
+            Address = req.Address,
+            City = req.City,
+            StateProvince = req.StateProvince,
+            Country = req.Country,
+            PostalCode = req.PostalCode,
+            PhoneNumber = req.PhoneNumber,
+            Email = req.Email,
+            TimezoneId = req.TimezoneId,
+            ManagerId = req.ManagerId,
+            SortOrder = req.SortOrder
         };
         db.BusinessBranches.Add(branch);
         await db.SaveChangesAsync(ct);
@@ -476,19 +552,19 @@ public sealed class BusinessBranchService(
         var branch = await db.BusinessBranches.FirstOrDefaultAsync(x => x.Id == branchId, ct)
             ?? throw new KeyNotFoundException("Branch not found.");
 
-        branch.Name          = req.Name;
-        branch.Type          = req.Type;
-        branch.Address       = req.Address;
-        branch.City          = req.City;
+        branch.Name = req.Name;
+        branch.Type = req.Type;
+        branch.Address = req.Address;
+        branch.City = req.City;
         branch.StateProvince = req.StateProvince;
-        branch.Country       = req.Country;
-        branch.PostalCode    = req.PostalCode;
-        branch.PhoneNumber   = req.PhoneNumber;
-        branch.Email         = req.Email;
-        branch.TimezoneId    = req.TimezoneId;
-        branch.ManagerId     = req.ManagerId;
-        branch.SortOrder     = req.SortOrder;
-        branch.IsActive      = req.IsActive;
+        branch.Country = req.Country;
+        branch.PostalCode = req.PostalCode;
+        branch.PhoneNumber = req.PhoneNumber;
+        branch.Email = req.Email;
+        branch.TimezoneId = req.TimezoneId;
+        branch.ManagerId = req.ManagerId;
+        branch.SortOrder = req.SortOrder;
+        branch.IsActive = req.IsActive;
         branch.ModifiedAtUtc = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(ct);
@@ -508,8 +584,8 @@ public sealed class BusinessBranchService(
             throw new InvalidOperationException("Branch does not belong to this business.");
 
         newHq.IsHeadquarters = true;
-        newHq.Type           = BranchType.Headquarters;
-        newHq.ModifiedAtUtc  = DateTimeOffset.UtcNow;
+        newHq.Type = BranchType.Headquarters;
+        newHq.ModifiedAtUtc = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(ct);
         await cache.RemoveAsync(CacheKeys.BranchById(newHqBranchId), ct);
@@ -529,7 +605,7 @@ public sealed class BusinessBranchService(
         if (activeCount <= 1)
             throw new InvalidOperationException("A business must have at least one active branch.");
 
-        branch.IsActive      = false;
+        branch.IsActive = false;
         branch.ModifiedAtUtc = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(ct);
@@ -575,8 +651,8 @@ public sealed class BusinessBranchService(
                 {
                     "assignedon" => query.SortDesc ? q.OrderByDescending(be => be.AssignedOn) : q.OrderBy(be => be.AssignedOn),
                     "releasedon" => query.SortDesc ? q.OrderByDescending(be => be.ReleasedOn) : q.OrderBy(be => be.ReleasedOn),
-                    "isprimary"  => query.SortDesc ? q.OrderByDescending(be => be.IsPrimary)  : q.OrderBy(be => be.IsPrimary),
-                    _            => q.OrderByDescending(be => be.IsPrimary).ThenBy(be => be.AssignedOn)
+                    "isprimary" => query.SortDesc ? q.OrderByDescending(be => be.IsPrimary) : q.OrderBy(be => be.IsPrimary),
+                    _ => q.OrderByDescending(be => be.IsPrimary).ThenBy(be => be.AssignedOn)
                 };
 
                 var branchName = branch.Name;
@@ -602,10 +678,10 @@ public sealed class BusinessBranchService(
 
         var assignment = new BranchEmployee
         {
-            Id         = Guid.NewGuid(),
-            BranchId   = branchId,
+            Id = Guid.NewGuid(),
+            BranchId = branchId,
             EmployeeId = req.EmployeeId,
-            IsPrimary  = req.IsPrimary,
+            IsPrimary = req.IsPrimary,
             AssignedOn = req.AssignedOn
         };
         db.BranchEmployees.Add(assignment);

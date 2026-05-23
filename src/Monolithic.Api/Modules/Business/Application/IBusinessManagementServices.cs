@@ -29,12 +29,16 @@ public interface IBusinessOwnershipService
     Task<OwnerDashboardDto> GetOwnerDashboardAsync(Guid ownerId, CancellationToken ct = default);
     /// <summary>Returns all business IDs owned by this user (active ownerships only).</summary>
     Task<IReadOnlyList<BusinessOwnershipDto>> GetByOwnerAsync(Guid ownerId, CancellationToken ct = default);
+    /// <summary>Returns full profile details for one owned business.</summary>
+    Task<OwnerBusinessDetailDto> GetOwnedBusinessByIdAsync(Guid ownerId, Guid businessId, CancellationToken ct = default);
     /// <summary>
     /// Creates a new business and assigns ownership to the user.
     /// Validates license quota before creation.
     /// Automatically creates: HQ branch + default settings + standard COA.
     /// </summary>
     Task<BusinessOwnershipDto> CreateBusinessAsync(Guid ownerId, CreateBusinessWithOwnerRequest request, CancellationToken ct = default);
+    /// <summary>Updates editable profile fields for one owned business.</summary>
+    Task<OwnerBusinessDetailDto> UpdateOwnedBusinessAsync(Guid ownerId, Guid businessId, UpdateOwnedBusinessRequest request, CancellationToken ct = default);
     /// <summary>Revokes ownership (soft-delete).</summary>
     Task RevokeOwnershipAsync(Guid ownerId, Guid businessId, CancellationToken ct = default);
 }

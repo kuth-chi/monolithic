@@ -69,6 +69,50 @@ public sealed record CreateBusinessWithOwnerRequest(
     /// <summary>Initial HQ branch address (defaults to business address if null).</summary>
     string? HeadquartersBranchAddress);
 
+/// <summary>
+/// Full business profile details for an owned business.
+/// Returned by owner-scoped detail endpoints.
+/// </summary>
+public sealed record OwnerBusinessDetailDto(
+    Guid BusinessId,
+    string BusinessName,
+    string? ShortName,
+    string? BusinessCode,
+    string? ShortDescription,
+    string? Description,
+    string LocalName,
+    string VatTin,
+    string BaseCurrencyCode,
+    string Address,
+    string City,
+    string StateProvince,
+    string Country,
+    string PostalCode,
+    int EmployeeCount,
+    bool IsActive,
+    string? LogoUrl,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset? ModifiedAtUtc);
+
+/// <summary>
+/// Owner-scoped request to update editable profile fields of a business.
+/// Ownership is validated server-side.
+/// </summary>
+public sealed record UpdateOwnedBusinessRequest(
+    string Name,
+    string? ShortName,
+    string? Code,
+    string? ShortDescription,
+    string? Description,
+    string LocalName,
+    string VatTin,
+    string BaseCurrencyCode,
+    string Address,
+    string City,
+    string StateProvince,
+    string Country,
+    string PostalCode);
+
 // ── License ───────────────────────────────────────────────────────────────────
 
 public sealed record BusinessLicenseDto(

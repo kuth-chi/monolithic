@@ -5,35 +5,42 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Monolithic.Api.Modules.Identity.Infrastructure.Data;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
 namespace Monolithic.Api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260219125820_AddCustomerManagementMVP")]
-    partial class AddCustomerManagementMVP
+    [Migration("20260313152902_InitialApplication")]
+    partial class InitialApplication
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.3");
+            modelBuilder
+                .HasAnnotation("ProductVersion", "10.0.3")
+                .HasAnnotation("Relational:MaxIdentifierLength", 63);
+
+            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("ClaimType")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("ClaimValue")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<Guid>("RoleId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -46,16 +53,18 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("ClaimType")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("ClaimValue")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<Guid>("UserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -67,16 +76,16 @@ namespace Monolithic.Api.Migrations
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<System.Guid>", b =>
                 {
                     b.Property<string>("LoginProvider")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("ProviderKey")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("ProviderDisplayName")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<Guid>("UserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasKey("LoginProvider", "ProviderKey");
 
@@ -88,10 +97,10 @@ namespace Monolithic.Api.Migrations
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<System.Guid>", b =>
                 {
                     b.Property<Guid>("UserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("RoleId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasKey("UserId", "RoleId");
 
@@ -103,16 +112,16 @@ namespace Monolithic.Api.Migrations
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<System.Guid>", b =>
                 {
                     b.Property<Guid>("UserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("LoginProvider")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("Name")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("Value")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.HasKey("UserId", "LoginProvider", "Name");
 
@@ -123,89 +132,89 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("AmountApplied")
                         .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<decimal>("AmountRemaining")
                         .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<DateTimeOffset?>("ApprovedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("ApprovedByUserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("CreatedByUserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("CreditAmount")
                         .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<decimal>("CreditAmountBase")
                         .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<string>("CreditNoteNumber")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("CurrencyCode")
                         .IsRequired()
                         .HasMaxLength(3)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(3)");
 
                     b.Property<decimal>("ExchangeRate")
                         .HasPrecision(18, 8)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(18,8)");
 
                     b.Property<DateOnly>("IssueDate")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("date");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Notes")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<Guid?>("OriginalVendorBillId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Reason")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(30)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(30)");
 
                     b.Property<Guid>("VendorId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("VendorReference")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.HasKey("Id");
 
@@ -225,31 +234,31 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateOnly>("ApplicationDate")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("date");
 
                     b.Property<decimal>("AppliedAmount")
                         .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("CreatedByUserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("CreditNoteId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Notes")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<Guid>("VendorBillId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -264,61 +273,61 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("BankAccountId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("CreatedByUserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("CurrencyCode")
                         .IsRequired()
                         .HasMaxLength(3)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(3)");
 
                     b.Property<DateTimeOffset?>("ExecutedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("ExecutedSessionId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Notes")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("PaymentMethod")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<decimal>("ScheduledAmount")
                         .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<DateOnly>("ScheduledDate")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("date");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<Guid>("VendorBillId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("VendorId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -337,76 +346,76 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("BankAccountId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("CreatedByUserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("CurrencyCode")
                         .IsRequired()
                         .HasMaxLength(3)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(3)");
 
                     b.Property<decimal>("ExchangeRate")
                         .HasPrecision(18, 8)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(18,8)");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Notes")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<DateOnly>("PaymentDate")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("date");
 
                     b.Property<string>("PaymentMethod")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("PaymentMode")
                         .IsRequired()
                         .HasMaxLength(30)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(30)");
 
                     b.Property<DateTimeOffset?>("PostedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("PostedByUserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Reference")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<decimal>("TotalAmount")
                         .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<decimal>("TotalAmountBase")
                         .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<Guid>("VendorId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -423,34 +432,34 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("AllocatedAmount")
                         .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<decimal>("BillAmountDueAfter")
                         .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<decimal>("BillAmountDueBefore")
                         .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsPartialPayment")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<Guid>("SessionId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("VendorBillId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("VendorBillPaymentId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -467,75 +476,75 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("BranchId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<int>("BreakMinutes")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Department")
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("Description")
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<bool>("EmployeeCanViewOwn")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<Guid?>("EmployeeId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("ExcludedHolidayIds")
                         .HasMaxLength(2000)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(2000)");
 
                     b.Property<bool>("HrCanView")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<int>("LateGraceMinutes")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<bool>("ManagerCanView")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<decimal>("RequiredHoursPerDay")
                         .HasPrecision(5, 2)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(5,2)");
 
                     b.Property<string>("Scope")
                         .IsRequired()
                         .HasMaxLength(30)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(30)");
 
                     b.Property<TimeOnly>("ShiftEnd")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("time without time zone");
 
                     b.Property<TimeOnly>("ShiftStart")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("time without time zone");
 
                     b.Property<byte>("WorkingDaysMask")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("smallint");
 
                     b.HasKey("Id");
 
@@ -550,59 +559,59 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("AccountName")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("AccountNumber")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("BankName")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("BranchName")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("CurrencyCode")
                         .IsRequired()
                         .HasMaxLength(10)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(10)");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsPrimary")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("OwnerType")
                         .IsRequired()
                         .HasMaxLength(21)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(21)");
 
                     b.Property<string>("RoutingNumber")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("SwiftCode")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
 
@@ -617,22 +626,22 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateOnly>("AssignedOn")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("date");
 
                     b.Property<Guid>("BranchId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("EmployeeId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("IsPrimary")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<DateOnly?>("ReleasedOn")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("date");
 
                     b.HasKey("Id");
 
@@ -645,93 +654,105 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Address")
                         .IsRequired()
                         .HasMaxLength(300)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(300)");
 
                     b.Property<string>("BaseCurrencyCode")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("City")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("Code")
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("Country")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByUserId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Description")
                         .HasMaxLength(2000)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(2000)");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("LocalName")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<Guid?>("OwnerEmployeeId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("PostalCode")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<Guid?>("PrimaryContactId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("ShortDescription")
                         .HasMaxLength(300)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(300)");
 
                     b.Property<string>("ShortName")
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("StateProvince")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("VatTin")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
 
                     b.HasIndex("OwnerEmployeeId");
 
                     b.HasIndex("PrimaryContactId");
+
+                    b.HasIndex("IsDeleted", "DeletedAtUtc")
+                        .HasDatabaseName("IX_Businesses_SoftDelete");
 
                     b.ToTable("Businesses");
                 });
@@ -740,80 +761,80 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Address")
                         .IsRequired()
                         .HasMaxLength(300)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(300)");
 
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("City")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("Country")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Email")
                         .HasMaxLength(256)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(256)");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsHeadquarters")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<Guid?>("ManagerId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("PhoneNumber")
                         .HasMaxLength(30)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(30)");
 
                     b.Property<string>("PostalCode")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<int>("SortOrder")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<string>("StateProvince")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("TimezoneId")
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(30)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(30)");
 
                     b.HasKey("Id");
 
@@ -828,21 +849,21 @@ namespace Monolithic.Api.Migrations
             modelBuilder.Entity("Monolithic.Api.Modules.Business.Domain.BusinessContact", b =>
                 {
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("ContactId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("AddedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsPrimary")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.HasKey("BusinessId", "ContactId");
 
@@ -855,47 +876,47 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("CountryCode")
                         .HasMaxLength(5)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(5)");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateOnly>("Date")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("date");
 
                     b.Property<string>("Description")
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("ExternalId")
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsRecurring")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("Source")
                         .IsRequired()
                         .HasMaxLength(30)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(30)");
 
                     b.HasKey("Id");
 
@@ -909,13 +930,13 @@ namespace Monolithic.Api.Migrations
             modelBuilder.Entity("Monolithic.Api.Modules.Business.Domain.BusinessIndustry", b =>
                 {
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("IndustryId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("AssignedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("BusinessId", "IndustryId");
 
@@ -928,54 +949,72 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("AllowAdvancedReporting")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("AllowIntegrations")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("AllowMultiCurrency")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("ExpirationWarningIssued")
+                        .HasColumnType("boolean");
 
                     b.Property<DateOnly?>("ExpiresOn")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("date");
 
                     b.Property<string>("ExternalSubscriptionId")
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset?>("LastRemoteValidatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("LastTamperDetectedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("MaxBranchesPerBusiness")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<int>("MaxBusinesses")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<int>("MaxEmployees")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("OwnerId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Plan")
                         .IsRequired()
                         .HasMaxLength(30)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(30)");
 
                     b.Property<DateOnly>("StartsOn")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("date");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<int>("TamperCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TamperWarningMessage")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ValidationHash")
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -988,45 +1027,45 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("AltText")
                         .HasMaxLength(300)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(300)");
 
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("ContentType")
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<long>("FileSizeBytes")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bigint");
 
                     b.Property<bool>("IsCurrent")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("MediaType")
                         .IsRequired()
                         .HasMaxLength(30)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(30)");
 
                     b.Property<string>("OriginalFileName")
                         .HasMaxLength(255)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(255)");
 
                     b.Property<string>("PublicUrl")
                         .HasMaxLength(2000)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(2000)");
 
                     b.Property<string>("StoragePath")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<DateTimeOffset>("UploadedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
@@ -1039,25 +1078,25 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("GrantedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsPrimaryOwner")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<Guid>("LicenseId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("OwnerId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset?>("RevokedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
@@ -1077,74 +1116,77 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("AccentColor")
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<bool>("AutoImportPublicHolidays")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("DefaultReportRangeDays")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<TimeOnly>("DefaultShiftEnd")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("time without time zone");
 
                     b.Property<TimeOnly>("DefaultShiftStart")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("time without time zone");
 
                     b.Property<string>("DisplayCurrencyCode")
                         .IsRequired()
                         .HasMaxLength(3)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(3)");
 
                     b.Property<bool>("EmployeeCanViewOwnAttendance")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<int>("FiscalYearStartMonth")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<string>("HolidayCountryCode")
                         .HasMaxLength(5)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(5)");
 
                     b.Property<int>("LateGraceMinutes")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Locale")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<bool>("ManagerCanViewAttendance")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("PrimaryColor")
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("SecondaryColor")
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int?>("SoftDeleteRetentionDays")
+                        .HasColumnType("integer");
 
                     b.Property<string>("TimezoneId")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<int>("WeekStartDay")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -1158,57 +1200,57 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("AccountCategory")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("AccountNumber")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("AccountType")
                         .IsRequired()
                         .HasMaxLength(30)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(30)");
 
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("CurrencyCode")
                         .HasMaxLength(3)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(3)");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsHeaderAccount")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsSystem")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<Guid?>("ParentAccountId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -1224,68 +1266,68 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("AverageUnitCostAfter")
                         .HasPrecision(18, 6)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(18,6)");
 
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("CreatedByUserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("EntryDateUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("EntryType")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<decimal?>("FifoLayerRemaining")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<Guid?>("FifoSourceLayerId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("InventoryItemId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("InventoryItemVariantId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Notes")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<decimal>("Quantity")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<Guid?>("ReferenceId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("ReferenceNumber")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<decimal>("StockQuantityAfter")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("StockValueAfter")
                         .HasPrecision(18, 6)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(18,6)");
 
                     b.Property<decimal>("TotalCost")
                         .HasPrecision(18, 6)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(18,6)");
 
                     b.Property<decimal>("UnitCost")
                         .HasPrecision(18, 6)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(18,6)");
 
                     b.HasKey("Id");
 
@@ -1302,41 +1344,41 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("CostingMethod")
                         .IsRequired()
                         .HasMaxLength(30)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(30)");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("InventoryItemId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<decimal>("LabourCostPerUnit")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("LandedCostPercentage")
                         .HasPrecision(8, 4)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(8,4)");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal>("OverheadPercentage")
                         .HasPrecision(8, 4)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(8,4)");
 
                     b.Property<decimal>("StandardCost")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.HasKey("Id");
 
@@ -1352,29 +1394,29 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<string>("Code")
                         .HasMaxLength(3)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(3)");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("DecimalPlaces")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("Symbol")
                         .IsRequired()
                         .HasMaxLength(10)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(10)");
 
                     b.HasKey("Code");
 
@@ -1385,90 +1427,102 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Address")
                         .IsRequired()
                         .HasMaxLength(300)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(300)");
 
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("City")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("Country")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("CustomerCode")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTimeOffset?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByUserId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(256)");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("Notes")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<string>("PaymentTerms")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("PostalCode")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("StateProvince")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("TaxId")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("Website")
                         .IsRequired()
                         .HasMaxLength(300)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(300)");
 
                     b.HasKey("Id");
 
                     b.HasIndex("BusinessId", "CustomerCode")
                         .IsUnique()
-                        .HasFilter("[CustomerCode] <> ''");
+                        .HasFilter("\"CustomerCode\" <> ''");
+
+                    b.HasIndex("BusinessId", "IsDeleted", "DeletedAtUtc")
+                        .HasDatabaseName("IX_Customers_SoftDelete");
 
                     b.ToTable("Customers");
                 });
@@ -1477,57 +1531,57 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("AddressLine1")
                         .IsRequired()
                         .HasMaxLength(300)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(300)");
 
                     b.Property<string>("AddressLine2")
                         .IsRequired()
                         .HasMaxLength(300)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(300)");
 
                     b.Property<string>("AddressType")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("City")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("Country")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("CustomerId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsDefault")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("PostalCode")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("StateProvince")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.HasKey("Id");
 
@@ -1540,47 +1594,47 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("CustomerId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Department")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(256)");
 
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsPrimary")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("JobTitle")
                         .IsRequired()
                         .HasMaxLength(120)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(120)");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Phone")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.HasKey("Id");
 
@@ -1593,91 +1647,91 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset?>("ApprovedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("ApprovedByUserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("CreatedByUserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("CurrencyCode")
                         .IsRequired()
                         .HasMaxLength(3)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(3)");
 
                     b.Property<decimal>("ExchangeRate")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Notes")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<decimal>("OrderDiscountAmount")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<string>("OrderDiscountType")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<decimal>("OrderDiscountValue")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<DateTimeOffset?>("QuoteExpiryDateUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("QuoteReceivedDateUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset>("RequestDateUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("RfqNumber")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<decimal>("ShippingFee")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(30)");
 
                     b.Property<decimal>("SubTotal")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("TaxAmount")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("TotalAmount")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("TotalAmountBase")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<Guid>("VendorId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("VendorQuoteReference")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.HasKey("Id");
 
@@ -1693,59 +1747,59 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal>("DiscountAmount")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<string>("DiscountType")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<decimal>("DiscountValue")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<Guid>("EstimatePurchaseOrderId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("InventoryItemId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("InventoryItemVariantId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("LineTotal")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("LineTotalAfterDiscount")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("LineTotalBeforeDiscount")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Notes")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<decimal>("Quantity")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("TaxAmount")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("TaxRate")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("UnitPrice")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.HasKey("Id");
 
@@ -1762,41 +1816,41 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("CreatedByUserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateOnly>("EffectiveDate")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("date");
 
                     b.Property<DateOnly?>("ExpiryDate")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("date");
 
                     b.Property<string>("FromCurrencyCode")
                         .IsRequired()
                         .HasMaxLength(3)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(3)");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal>("Rate")
                         .HasPrecision(18, 8)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(18,8)");
 
                     b.Property<string>("Source")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("ToCurrencyCode")
                         .IsRequired()
                         .HasMaxLength(3)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(3)");
 
                     b.HasKey("Id");
 
@@ -1811,25 +1865,25 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.HasKey("Id");
 
@@ -1839,112 +1893,307 @@ namespace Monolithic.Api.Migrations
                     b.ToTable("Industries");
                 });
 
-            modelBuilder.Entity("Monolithic.Api.Modules.Business.Domain.PurchaseOrder", b =>
+            modelBuilder.Entity("Monolithic.Api.Modules.Business.Domain.JournalEntry", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTimeOffset?>("ApprovedAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid?>("ApprovedByUserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid?>("ChartOfAccountId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid?>("CreatedByUserId")
-                        .HasColumnType("TEXT");
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("CurrencyCode")
                         .IsRequired()
                         .HasMaxLength(3)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(3)");
 
-                    b.Property<Guid?>("EstimatePurchaseOrderId")
-                        .HasColumnType("TEXT");
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("EntryNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.Property<decimal>("ExchangeRate")
-                        .HasColumnType("TEXT");
+                        .HasPrecision(18, 8)
+                        .HasColumnType("numeric(18,8)");
+
+                    b.Property<string>("FiscalPeriod")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("PostedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PostedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ReversalOfEntryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ReversedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ReversedByEntryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ReversedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("SourceDocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SourceDocumentReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal>("TotalCredits")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("TotalDebits")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateOnly>("TransactionDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReversalOfEntryId");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("BusinessId", "EntryNumber")
+                        .IsUnique();
+
+                    b.HasIndex("BusinessId", "FiscalPeriod");
+
+                    b.HasIndex("BusinessId", "TransactionDate");
+
+                    b.ToTable("JournalEntries");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Business.Domain.JournalEntryAuditLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("JournalEntryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UserDisplayName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JournalEntryId");
+
+                    b.HasIndex("OccurredAtUtc");
+
+                    b.ToTable("JournalEntryAuditLogs");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Business.Domain.JournalEntryLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CostCenter")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<decimal>("CreditAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("CreditAmountBase")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("DebitAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<decimal>("DebitAmountBase")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("JournalEntryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("LineDescription")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<int>("LineNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ProjectCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
+
+                    b.HasIndex("JournalEntryId", "LineNumber")
+                        .IsUnique();
+
+                    b.ToTable("JournalEntryLines");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Business.Domain.PurchaseOrder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ApprovedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ApprovedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ChartOfAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<Guid?>("EstimatePurchaseOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ExchangeRate")
+                        .HasColumnType("numeric");
 
                     b.Property<DateTimeOffset?>("ExpectedDeliveryDateUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("HoldReason")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<DateTimeOffset?>("HoldStartedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("InternalNotes")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<bool>("IsOnHold")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Notes")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<DateTimeOffset>("OrderDateUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal>("OrderDiscountAmount")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<string>("OrderDiscountType")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<decimal>("OrderDiscountValue")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<string>("PoNumber")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<DateTimeOffset?>("ReceivedDateUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal>("ShippingFee")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(30)");
 
                     b.Property<decimal>("SubTotal")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("TaxAmount")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("TotalAmount")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("TotalAmountBase")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<Guid>("VendorId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -1964,65 +2213,65 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal>("DiscountAmount")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<string>("DiscountType")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<decimal>("DiscountValue")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<Guid>("InventoryItemId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("InventoryItemVariantId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("LineTotal")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("LineTotalAfterDiscount")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("LineTotalBeforeDiscount")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Notes")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<Guid>("PurchaseOrderId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("Quantity")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("QuantityBilled")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("QuantityReceived")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("TaxAmount")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("TaxRate")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("UnitPrice")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.HasKey("Id");
 
@@ -2039,78 +2288,88 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Address")
                         .IsRequired()
                         .HasMaxLength(300)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(300)");
 
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("City")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("ContactPerson")
                         .IsRequired()
                         .HasMaxLength(150)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(150)");
 
                     b.Property<string>("Country")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByUserId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(256)");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("PaymentTerms")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("PostalCode")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("StateProvince")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("TaxId")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BusinessId");
+                    b.HasIndex("BusinessId", "IsDeleted", "DeletedAtUtc")
+                        .HasDatabaseName("IX_Vendors_SoftDelete");
 
                     b.ToTable("Vendors");
                 });
@@ -2119,108 +2378,108 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("AmountDue")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("AmountPaid")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<DateTimeOffset?>("ApprovedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("ApprovedByUserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateOnly>("BillDate")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("date");
 
                     b.Property<string>("BillNumber")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("ChartOfAccountId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("CreatedByUserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("CurrencyCode")
                         .IsRequired()
                         .HasMaxLength(3)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(3)");
 
                     b.Property<int>("DaysOverdue")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<DateOnly>("DueDate")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("date");
 
                     b.Property<decimal>("ExchangeRate")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<string>("InternalNotes")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Notes")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<decimal>("OrderDiscountAmount")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<string>("OrderDiscountType")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<decimal>("OrderDiscountValue")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<Guid?>("PurchaseOrderId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("ShippingFee")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(30)");
 
                     b.Property<decimal>("SubTotal")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("TaxAmount")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("TotalAmount")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("TotalAmountBase")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<Guid>("VendorId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("VendorInvoiceNumber")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.HasKey("Id");
 
@@ -2242,59 +2501,59 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal>("DiscountAmount")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<string>("DiscountType")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<decimal>("DiscountValue")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<Guid>("InventoryItemId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("InventoryItemVariantId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("LineTotal")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("LineTotalAfterDiscount")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("LineTotalBeforeDiscount")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<string>("Notes")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<Guid?>("PurchaseOrderItemId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("Quantity")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("TaxAmount")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("TaxRate")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("UnitPrice")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<Guid>("VendorBillId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -2313,54 +2572,54 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("Amount")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("AmountBase")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<Guid?>("BankAccountId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("CreatedByUserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("CurrencyCode")
                         .IsRequired()
                         .HasMaxLength(3)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(3)");
 
                     b.Property<decimal>("ExchangeRate")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Notes")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<DateOnly>("PaymentDate")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("date");
 
                     b.Property<string>("PaymentMethod")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("Reference")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<Guid>("VendorBillId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -2375,42 +2634,42 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("ColorHex")
                         .IsRequired()
                         .HasMaxLength(10)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(10)");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<int>("SortOrder")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -2424,40 +2683,40 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("EarlyPayDiscountDays")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("EarlyPayDiscountPercent")
                         .HasPrecision(8, 4)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(8,4)");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsCod")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsDefault")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<int>("NetDays")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -2470,75 +2729,75 @@ namespace Monolithic.Api.Migrations
             modelBuilder.Entity("Monolithic.Api.Modules.Business.Domain.VendorProfile", b =>
                 {
                     b.Property<Guid>("VendorId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("BlacklistReason")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal?>("CreditLimitBase")
                         .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<int?>("CreditTermDaysOverride")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<Guid?>("CreditTermId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("DefaultVatPercent")
                         .HasPrecision(8, 4)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(8,4)");
 
                     b.Property<string>("HoldReason")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<bool>("IsBlacklisted")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsOnHold")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsVatRegistered")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<decimal?>("MinimumPaymentAmount")
                         .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal>("PerformanceRating")
                         .HasPrecision(3, 2)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric(3,2)");
 
                     b.Property<Guid?>("PreferredBankAccountId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("PreferredPaymentMethod")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("RelationshipNotes")
                         .IsRequired()
                         .HasMaxLength(2000)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(2000)");
 
                     b.Property<string>("VatRegistrationNumber")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<Guid?>("VendorClassId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasKey("VendorId");
 
@@ -2551,36 +2810,233 @@ namespace Monolithic.Api.Migrations
                     b.ToTable("VendorProfiles");
                 });
 
+            modelBuilder.Entity("Monolithic.Api.Modules.Finance.Domain.Expense", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<decimal>("ExchangeRate")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateOnly>("ExpenseDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("ExpenseNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset?>("PaidAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RejectionReason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("ReviewedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ReviewedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid>("SubmittedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("TotalAmountBase")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessId", "ExpenseNumber")
+                        .IsUnique();
+
+                    b.ToTable("Expenses");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Finance.Domain.ExpenseCategory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DefaultChartOfAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("ExpenseCategories");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Finance.Domain.ExpenseItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("AmountBase")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<Guid?>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<decimal>("ExchangeRate")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid?>("ExpenseCategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("ExpenseDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("ExpenseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsBillable")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ReceiptUrl")
+                        .HasColumnType("text");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpenseId");
+
+                    b.ToTable("ExpenseItems");
+                });
+
             modelBuilder.Entity("Monolithic.Api.Modules.Identity.Domain.ApplicationRole", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByUserId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsSystemRole")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<string>("Name")
                         .HasMaxLength(256)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(256)");
 
                     b.Property<string>("NormalizedName")
                         .HasMaxLength(256)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(256)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("IsSystemRole");
 
                     b.HasIndex("NormalizedName")
                         .IsUnique()
                         .HasDatabaseName("RoleNameIndex");
+
+                    b.HasIndex("IsDeleted", "DeletedAtUtc");
 
                     b.ToTable("AspNetRoles", (string)null);
                 });
@@ -2589,73 +3045,90 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<int>("AccessFailedCount")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByUserId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Email")
                         .HasMaxLength(256)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(256)");
 
                     b.Property<bool>("EmailConfirmed")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("FullName")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<DateTimeOffset?>("LastLoginUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("LockoutEnabled")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("LockoutEnd")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("NormalizedEmail")
                         .HasMaxLength(256)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(256)");
 
                     b.Property<string>("NormalizedUserName")
                         .HasMaxLength(256)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(256)");
 
                     b.Property<string>("PasswordHash")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
 
                     b.Property<string>("PhoneNumber")
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<bool>("PhoneNumberConfirmed")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("SecurityStamp")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("SuspendedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SuspendedReason")
+                        .HasColumnType("text");
 
                     b.Property<bool>("TwoFactorEnabled")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("UserName")
                         .HasMaxLength(256)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(256)");
 
                     b.Property<string>("UserType")
                         .IsRequired()
                         .HasMaxLength(8)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(8)");
 
                     b.HasKey("Id");
 
@@ -2666,6 +3139,8 @@ namespace Monolithic.Api.Migrations
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
 
+                    b.HasIndex("IsDeleted", "DeletedAtUtc");
+
                     b.ToTable("AspNetUsers", (string)null);
 
                     b.HasDiscriminator<string>("UserType").HasValue("User");
@@ -2673,29 +3148,118 @@ namespace Monolithic.Api.Migrations
                     b.UseTphMappingStrategy();
                 });
 
+            modelBuilder.Entity("Monolithic.Api.Modules.Identity.Domain.AuthAuditLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BusinessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Event")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PreviousBusinessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Success")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email");
+
+                    b.HasIndex("OccurredAtUtc");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("Event", "OccurredAtUtc");
+
+                    b.ToTable("AuthAuditLogs");
+                });
+
             modelBuilder.Entity("Monolithic.Api.Modules.Identity.Domain.Permission", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActionName")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(512)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("FeatureName")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasDefaultValue("");
+
+                    b.Property<string>("GroupName")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasDefaultValue("");
+
+                    b.Property<bool>("IsSelfScoped")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasDefaultValue("");
 
                     b.HasKey("Id");
 
                     b.HasIndex("Name")
                         .IsUnique();
+
+                    b.HasIndex("GroupName", "FeatureName", "ActionName");
 
                     b.ToTable("Permissions");
                 });
@@ -2703,10 +3267,10 @@ namespace Monolithic.Api.Migrations
             modelBuilder.Entity("Monolithic.Api.Modules.Identity.Domain.RolePermission", b =>
                 {
                     b.Property<Guid>("RoleId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("PermissionId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasKey("RoleId", "PermissionId");
 
@@ -2715,16 +3279,49 @@ namespace Monolithic.Api.Migrations
                     b.ToTable("RolePermissions");
                 });
 
+            modelBuilder.Entity("Monolithic.Api.Modules.Identity.Domain.UserBusiness", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset>("JoinedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessId");
+
+                    b.HasIndex("UserId", "BusinessId")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "IsDefault");
+
+                    b.ToTable("UserBusinesses");
+                });
+
             modelBuilder.Entity("Monolithic.Api.Modules.Identity.Domain.UserPermission", b =>
                 {
                     b.Property<Guid>("UserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("PermissionId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("Granted")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.HasKey("UserId", "PermissionId");
 
@@ -2737,51 +3334,57 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("CostPrice")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedByUserId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<decimal>("ReorderLevel")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("ReorderQuantity")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("SellingPrice")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<string>("Sku")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("Unit")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
 
@@ -2795,48 +3398,48 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("AltText")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("ContentType")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<int>("DisplayOrder")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<long>("FileSizeBytes")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bigint");
 
                     b.Property<Guid>("InventoryItemId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("IsMain")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<string>("OriginalFileName")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(255)");
 
                     b.Property<string>("StoragePath")
                         .IsRequired()
                         .HasMaxLength(1000)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<DateTimeOffset>("UploadedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("UploadedByUserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("VariantId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -2851,35 +3454,35 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("DisplayOrder")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("InventoryItemId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<decimal>("PriceAdjustment")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<string>("SkuSuffix")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.HasKey("Id");
 
@@ -2893,20 +3496,20 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("AttributeName")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("AttributeValue")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<Guid>("VariantId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -2920,37 +3523,37 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("InventoryItemId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Notes")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<Guid?>("PerformedByUserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("Quantity")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<string>("ReferenceNumber")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("TransactionType")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<Guid>("WarehouseLocationId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -2965,25 +3568,25 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("InventoryItemId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal>("QuantityOnHand")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("QuantityReserved")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("numeric");
 
                     b.Property<Guid>("WarehouseLocationId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -2999,62 +3602,62 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Address")
                         .IsRequired()
                         .HasMaxLength(300)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(300)");
 
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("City")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("Country")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsDefault")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("PostalCode")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("StateProvince")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.HasKey("Id");
 
@@ -3068,39 +3671,39 @@ namespace Monolithic.Api.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("ModifiedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<Guid>("WarehouseId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Zone")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.HasKey("Id");
 
@@ -3110,12 +3713,917 @@ namespace Monolithic.Api.Migrations
                     b.ToTable("WarehouseLocations");
                 });
 
+            modelBuilder.Entity("Monolithic.Api.Modules.Purchases.Domain.PurchaseReturn", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ConfirmedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ConfirmedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("CreditedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<decimal>("ExchangeRate")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid?>("PurchaseOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateOnly>("ReturnDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("ReturnNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTimeOffset?>("ShippedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("TotalAmountBase")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid?>("VendorBillId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("VendorCreditNoteReference")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("VendorId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessId", "ReturnNumber")
+                        .IsUnique();
+
+                    b.ToTable("PurchaseReturns");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Purchases.Domain.PurchaseReturnItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("InventoryItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("PurchaseReturnId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("numeric");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("TaxRate")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PurchaseReturnId");
+
+                    b.ToTable("PurchaseReturnItems");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.ArCreditNote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ConfirmedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ConfirmedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("CreditNoteDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("CreditNoteNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ExchangeRate")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<decimal>("RemainingAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid?>("SalesInvoiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<decimal>("SubTotal")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("TotalAmountBase")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessId", "CreditNoteNumber")
+                        .IsUnique();
+
+                    b.ToTable("ArCreditNotes");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.ArCreditNoteApplication", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AmountApplied")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateOnly>("ApplicationDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid?>("AppliedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ArCreditNoteId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("SalesInvoiceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ArCreditNoteId");
+
+                    b.HasIndex("SalesInvoiceId");
+
+                    b.ToTable("ArCreditNoteApplications");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.ArCreditNoteItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ArCreditNoteId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid?>("InventoryItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("numeric");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("TaxRate")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ArCreditNoteId");
+
+                    b.ToTable("ArCreditNoteItems");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.Quotation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("AcceptedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ConvertedToSalesOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ExchangeRate")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateOnly>("ExpiryDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ModifiedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<decimal>("OrderDiscountAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("OrderDiscountType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal>("OrderDiscountValue")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateOnly>("QuotationDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("QuotationNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTimeOffset?>("RejectedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("SentAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("ShippingFee")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<decimal>("SubTotal")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("TermsAndConditions")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessId", "QuotationNumber")
+                        .IsUnique();
+
+                    b.ToTable("Quotations");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.QuotationItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("DiscountType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal>("DiscountValue")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid?>("InventoryItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("LineTotalAfterDiscount")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("LineTotalBeforeDiscount")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid>("QuotationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("TaxRate")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("QuotationId");
+
+                    b.ToTable("QuotationItems");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.SalesInvoice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AmountDue")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("AmountPaid")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ChartOfAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CustomerReference")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("DaysOverdue")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("DueDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("ExchangeRate")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateOnly>("InvoiceDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("InvoiceNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<decimal>("OrderDiscountAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("OrderDiscountType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal>("OrderDiscountValue")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid?>("SalesOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("SentAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("ShippingFee")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<decimal>("SubTotal")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("TermsAndConditions")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("TotalAmountBase")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateTimeOffset?>("VoidedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SalesOrderId");
+
+                    b.HasIndex("BusinessId", "InvoiceNumber")
+                        .IsUnique();
+
+                    b.ToTable("SalesInvoices");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.SalesInvoiceItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("DiscountType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal>("DiscountValue")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid?>("InventoryItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("LineTotalAfterDiscount")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("LineTotalBeforeDiscount")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid>("SalesInvoiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("SalesOrderItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("TaxRate")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SalesInvoiceId");
+
+                    b.ToTable("SalesInvoiceItems");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.SalesInvoicePayment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("AmountBase")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<decimal>("ExchangeRate")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateOnly>("PaymentDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("PaymentMethod")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("PaymentReference")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid?>("ReceivedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SalesInvoiceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SalesInvoiceId");
+
+                    b.ToTable("SalesInvoicePayments");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.SalesOrder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ConfirmedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ConfirmedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DeliveryAddress")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("ExchangeRate")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateOnly?>("ExpectedDeliveryDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset?>("ModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateOnly>("OrderDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("OrderDiscountAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("OrderDiscountType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal>("OrderDiscountValue")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("OrderNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid?>("QuotationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ShippingFee")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("ShippingMethod")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<decimal>("SubTotal")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("TermsAndConditions")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("TotalAmountBase")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessId", "OrderNumber")
+                        .IsUnique();
+
+                    b.ToTable("SalesOrders");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.SalesOrderItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("DiscountType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal>("DiscountValue")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid?>("InventoryItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("LineTotal")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("LineTotalAfterDiscount")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("LineTotalBeforeDiscount")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("QuantityInvoiced")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid?>("QuotationItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SalesOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("TaxAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("TaxRate")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SalesOrderId");
+
+                    b.ToTable("SalesOrderItems");
+                });
+
             modelBuilder.Entity("Monolithic.Api.Modules.Business.Domain.BusinessBankAccount", b =>
                 {
                     b.HasBaseType("Monolithic.Api.Modules.Business.Domain.BankAccountBase");
 
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasIndex("BusinessId", "AccountNumber")
                         .IsUnique();
@@ -3128,7 +4636,7 @@ namespace Monolithic.Api.Migrations
                     b.HasBaseType("Monolithic.Api.Modules.Business.Domain.BankAccountBase");
 
                     b.Property<Guid>("CustomerId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasIndex("CustomerId", "AccountNumber")
                         .IsUnique();
@@ -3141,7 +4649,7 @@ namespace Monolithic.Api.Migrations
                     b.HasBaseType("Monolithic.Api.Modules.Business.Domain.BankAccountBase");
 
                     b.Property<Guid>("VendorId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasIndex("VendorId", "AccountNumber")
                         .IsUnique();
@@ -3156,10 +4664,10 @@ namespace Monolithic.Api.Migrations
                     b.Property<string>("JobTitle")
                         .IsRequired()
                         .HasMaxLength(120)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(120)");
 
                     b.Property<Guid?>("PrimaryBusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.HasIndex("PrimaryBusinessId");
 
@@ -3171,33 +4679,33 @@ namespace Monolithic.Api.Migrations
                     b.HasBaseType("Monolithic.Api.Modules.Identity.Domain.ApplicationUser");
 
                     b.Property<Guid>("BusinessId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Department")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("EmployeeNumber")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<DateTimeOffset>("HiredAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("JobTitle")
                         .IsRequired()
                         .HasMaxLength(120)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(120)");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("character varying(50)");
 
                     b.Property<DateTimeOffset?>("TerminatedAtUtc")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasIndex("BusinessId", "EmployeeNumber")
                         .IsUnique();
@@ -3699,6 +5207,54 @@ namespace Monolithic.Api.Migrations
                     b.Navigation("ToCurrency");
                 });
 
+            modelBuilder.Entity("Monolithic.Api.Modules.Business.Domain.JournalEntry", b =>
+                {
+                    b.HasOne("Monolithic.Api.Modules.Business.Domain.Business", "Business")
+                        .WithMany()
+                        .HasForeignKey("BusinessId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Monolithic.Api.Modules.Business.Domain.JournalEntry", "ReversalOfEntry")
+                        .WithMany()
+                        .HasForeignKey("ReversalOfEntryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Business");
+
+                    b.Navigation("ReversalOfEntry");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Business.Domain.JournalEntryAuditLog", b =>
+                {
+                    b.HasOne("Monolithic.Api.Modules.Business.Domain.JournalEntry", "JournalEntry")
+                        .WithMany("AuditLogs")
+                        .HasForeignKey("JournalEntryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("JournalEntry");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Business.Domain.JournalEntryLine", b =>
+                {
+                    b.HasOne("Monolithic.Api.Modules.Business.Domain.ChartOfAccount", "Account")
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Monolithic.Api.Modules.Business.Domain.JournalEntry", "JournalEntry")
+                        .WithMany("Lines")
+                        .HasForeignKey("JournalEntryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Account");
+
+                    b.Navigation("JournalEntry");
+                });
+
             modelBuilder.Entity("Monolithic.Api.Modules.Business.Domain.PurchaseOrder", b =>
                 {
                     b.HasOne("Monolithic.Api.Modules.Business.Domain.Business", "Business")
@@ -3907,6 +5463,17 @@ namespace Monolithic.Api.Migrations
                     b.Navigation("VendorClass");
                 });
 
+            modelBuilder.Entity("Monolithic.Api.Modules.Finance.Domain.ExpenseItem", b =>
+                {
+                    b.HasOne("Monolithic.Api.Modules.Finance.Domain.Expense", "Expense")
+                        .WithMany("Items")
+                        .HasForeignKey("ExpenseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Expense");
+                });
+
             modelBuilder.Entity("Monolithic.Api.Modules.Identity.Domain.RolePermission", b =>
                 {
                     b.HasOne("Monolithic.Api.Modules.Identity.Domain.Permission", "Permission")
@@ -3924,6 +5491,25 @@ namespace Monolithic.Api.Migrations
                     b.Navigation("Permission");
 
                     b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Identity.Domain.UserBusiness", b =>
+                {
+                    b.HasOne("Monolithic.Api.Modules.Business.Domain.Business", "Business")
+                        .WithMany()
+                        .HasForeignKey("BusinessId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Monolithic.Api.Modules.Identity.Domain.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Business");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Monolithic.Api.Modules.Identity.Domain.UserPermission", b =>
@@ -4032,6 +5618,98 @@ namespace Monolithic.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Purchases.Domain.PurchaseReturnItem", b =>
+                {
+                    b.HasOne("Monolithic.Api.Modules.Purchases.Domain.PurchaseReturn", "PurchaseReturn")
+                        .WithMany("Items")
+                        .HasForeignKey("PurchaseReturnId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PurchaseReturn");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.ArCreditNoteApplication", b =>
+                {
+                    b.HasOne("Monolithic.Api.Modules.Sales.Domain.ArCreditNote", "ArCreditNote")
+                        .WithMany("Applications")
+                        .HasForeignKey("ArCreditNoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Monolithic.Api.Modules.Sales.Domain.SalesInvoice", "SalesInvoice")
+                        .WithMany("CreditNoteApplications")
+                        .HasForeignKey("SalesInvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ArCreditNote");
+
+                    b.Navigation("SalesInvoice");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.ArCreditNoteItem", b =>
+                {
+                    b.HasOne("Monolithic.Api.Modules.Sales.Domain.ArCreditNote", "ArCreditNote")
+                        .WithMany("Items")
+                        .HasForeignKey("ArCreditNoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ArCreditNote");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.QuotationItem", b =>
+                {
+                    b.HasOne("Monolithic.Api.Modules.Sales.Domain.Quotation", "Quotation")
+                        .WithMany("Items")
+                        .HasForeignKey("QuotationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Quotation");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.SalesInvoice", b =>
+                {
+                    b.HasOne("Monolithic.Api.Modules.Sales.Domain.SalesOrder", null)
+                        .WithMany("Invoices")
+                        .HasForeignKey("SalesOrderId");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.SalesInvoiceItem", b =>
+                {
+                    b.HasOne("Monolithic.Api.Modules.Sales.Domain.SalesInvoice", "SalesInvoice")
+                        .WithMany("Items")
+                        .HasForeignKey("SalesInvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SalesInvoice");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.SalesInvoicePayment", b =>
+                {
+                    b.HasOne("Monolithic.Api.Modules.Sales.Domain.SalesInvoice", "SalesInvoice")
+                        .WithMany("Payments")
+                        .HasForeignKey("SalesInvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SalesInvoice");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.SalesOrderItem", b =>
+                {
+                    b.HasOne("Monolithic.Api.Modules.Sales.Domain.SalesOrder", "SalesOrder")
+                        .WithMany("Items")
+                        .HasForeignKey("SalesOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SalesOrder");
                 });
 
             modelBuilder.Entity("Monolithic.Api.Modules.Business.Domain.BusinessBankAccount", b =>
@@ -4178,6 +5856,13 @@ namespace Monolithic.Api.Migrations
                     b.Navigation("BusinessIndustries");
                 });
 
+            modelBuilder.Entity("Monolithic.Api.Modules.Business.Domain.JournalEntry", b =>
+                {
+                    b.Navigation("AuditLogs");
+
+                    b.Navigation("Lines");
+                });
+
             modelBuilder.Entity("Monolithic.Api.Modules.Business.Domain.PurchaseOrder", b =>
                 {
                     b.Navigation("Items");
@@ -4226,6 +5911,11 @@ namespace Monolithic.Api.Migrations
                     b.Navigation("VendorProfiles");
                 });
 
+            modelBuilder.Entity("Monolithic.Api.Modules.Finance.Domain.Expense", b =>
+                {
+                    b.Navigation("Items");
+                });
+
             modelBuilder.Entity("Monolithic.Api.Modules.Identity.Domain.Permission", b =>
                 {
                     b.Navigation("RolePermissions");
@@ -4261,6 +5951,39 @@ namespace Monolithic.Api.Migrations
             modelBuilder.Entity("Monolithic.Api.Modules.Inventory.Domain.WarehouseLocation", b =>
                 {
                     b.Navigation("Stocks");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Purchases.Domain.PurchaseReturn", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.ArCreditNote", b =>
+                {
+                    b.Navigation("Applications");
+
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.Quotation", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.SalesInvoice", b =>
+                {
+                    b.Navigation("CreditNoteApplications");
+
+                    b.Navigation("Items");
+
+                    b.Navigation("Payments");
+                });
+
+            modelBuilder.Entity("Monolithic.Api.Modules.Sales.Domain.SalesOrder", b =>
+                {
+                    b.Navigation("Invoices");
+
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("Monolithic.Api.Modules.Identity.Domain.Contact", b =>

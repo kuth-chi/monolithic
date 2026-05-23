@@ -38,6 +38,7 @@ public static class IdentityModuleRegistration
             options.ConfigureWarnings(w =>
             {
                 w.Ignore(CoreEventId.PossibleIncorrectRequiredNavigationWithQueryFilterInteractionWarning);
+                w.Ignore(RelationalEventId.PendingModelChangesWarning);
             });
         });
 
@@ -121,6 +122,8 @@ public static class IdentityModuleRegistration
 
     public static async Task InitializeIdentityAsync(this WebApplication app)
     {
+        // Schema is migrated during platform startup via ModuleDatabaseInitializer.
+        // Identity initialization remains responsible only for idempotent seed data.
         await SeedData.SeedAsync(app.Services);
     }
 }

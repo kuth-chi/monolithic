@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Monolithic.Api.Migrations.PlatformDb
 {
     /// <inheritdoc />
-    public partial class InitialPlatformSchema : Migration
+    public partial class InitialPlatform : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

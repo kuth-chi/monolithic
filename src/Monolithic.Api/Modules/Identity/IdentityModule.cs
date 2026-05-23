@@ -41,11 +41,11 @@ public sealed class IdentityModule : ModuleBase
     public override void ConfigurePipeline(WebApplication app)
         => app.UseIdentityModule();
 
-    // ApplicationDbContext is initialised via EnsureCreatedAsync in SeedData,
-    // not through the module migration pipeline. Returning null here prevents
-    // ModuleDatabaseInitializer from calling MigrateAsync on it, which would
-    // conflict with the EnsureCreated strategy and raise PendingModelChangesWarning.
-    public override DatabaseDescriptor? GetDatabaseDescriptor() => null;
+    public override DatabaseDescriptor? GetDatabaseDescriptor() =>
+        new(ModuleId,
+            ConnectionStringKey: "Infrastructure:Databases:Identity",
+            DbContextType:       typeof(Infrastructure.Data.ApplicationDbContext),
+            DisplayName:         "Application DB");
 
     public override IEnumerable<NavigationItem> GetNavigationItems()
     {

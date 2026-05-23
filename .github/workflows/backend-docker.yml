@@ -1,0 +1,96 @@
+name: Backend Docker Publish
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+    paths:
+      - src/Monolithic.Api/**
+      - .github/workflows/backend-docker.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_NAME: kuthchi/monolithic-api
+
+concurrency:
+  group: backend-docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: Build and Push Backend Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+
+      - name: Detect ref type and pre-release flag
+        id: ref_flags
+        shell: bash
+        run: |
+          REF_NAME="${GITHUB_REF_NAME}"
+          IS_TAG="false"
+          IS_PRERELEASE_TAG="false"
+
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            IS_TAG="true"
+            if [[ "${REF_NAME}" == *-* ]]; then
+              IS_PRERELEASE_TAG="true"
+            fi
+          fi
+
+          echo "is_tag=${IS_TAG}" >> "$GITHUB_OUTPUT"
+          echo "is_prerelease_tag=${IS_PRERELEASE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Compute image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || (steps.ref_flags.outputs.is_tag == 'true' && steps.ref_flags.outputs.is_prerelease_tag == 'false') }}
+            type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') }}
+            type=semver,pattern={{major}},enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') }}
+            type=sha,prefix=sha-,format=short
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/Monolithic.Api/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Job summary
+        run: |
+          echo "## Backend Docker Publish" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Workflow | backend-docker.yml |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Branch | ${{ github.ref_name }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Commit | ${{ github.sha }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Published tags:" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ steps.meta.outputs.tags }}" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Monolithic.Api.Migrations.PlatformDb
 {
     [DbContext(typeof(PlatformDbContext))]
-    [Migration("20260227154127_InitialPlatformSchema")]
-    partial class InitialPlatformSchema
+    [Migration("20260313152931_InitialPlatform")]
+    partial class InitialPlatform
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

@@ -51,6 +51,11 @@ public sealed class BusinessOwnerController(
     public async Task<IActionResult> GetOwnedBusinesses(CancellationToken ct)
         => Ok(await ownershipService.GetByOwnerAsync(CurrentUserId, ct));
 
+    [HttpGet("businesses/{businessId:guid}")]
+    [RequirePermission("owner:read")]
+    public async Task<IActionResult> GetOwnedBusinessDetail(Guid businessId, CancellationToken ct)
+        => Ok(await ownershipService.GetOwnedBusinessByIdAsync(CurrentUserId, businessId, ct));
+
     // ── Create Business ───────────────────────────────────────────────────────
 
     /// <summary>
@@ -68,6 +73,14 @@ public sealed class BusinessOwnerController(
         var result = await ownershipService.CreateBusinessAsync(CurrentUserId, request, ct);
         return CreatedAtAction(nameof(GetOwnedBusinesses), result);
     }
+
+    [HttpPut("businesses/{businessId:guid}")]
+    [RequirePermission("owner:write")]
+    public async Task<IActionResult> UpdateOwnedBusiness(
+        Guid businessId,
+        [FromBody] UpdateOwnedBusinessRequest request,
+        CancellationToken ct)
+        => Ok(await ownershipService.UpdateOwnedBusinessAsync(CurrentUserId, businessId, request, ct));
 
     [HttpDelete("businesses/{businessId:guid}/revoke")]
     [RequirePermission("owner:write")]

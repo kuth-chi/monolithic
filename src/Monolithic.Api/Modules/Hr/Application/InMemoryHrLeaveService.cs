@@ -1,9 +1,12 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Monolithic.Api.Modules.Identity.Infrastructure.Data;
 using Monolithic.Api.Modules.Hr.Contracts;
 
 namespace Monolithic.Api.Modules.Hr.Application;
 
-public sealed class InMemoryHrLeaveService : IHrLeaveService
+public sealed class InMemoryHrLeaveService(ApplicationDbContext db) : IHrLeaveService
 {
     private static readonly ConcurrentDictionary<Guid, List<LeaveRequestDto>> LeaveByBusiness = new();
 
@@ -30,7 +33,7 @@ public sealed class InMemoryHrLeaveService : IHrLeaveService
         return Task.FromResult<IReadOnlyList<LeaveRequestDto>>(result);
     }
 
-    public Task<LeaveRequestDto> CreateAsync(
+    public async Task<LeaveRequestDto> CreateAsync(
         Guid businessId,
         CreateLeaveRequest request,
         CancellationToken ct = default)
@@ -44,14 +47,30 @@ public sealed class InMemoryHrLeaveService : IHrLeaveService
         if (string.IsNullOrWhiteSpace(request.LeaveType))
             throw new ArgumentException("LeaveType is required.", nameof(request));
 
+        var leaveType = request.LeaveType.Trim();
         var totalDays = request.EndDate.DayNumber - request.StartDate.DayNumber + 1;
+        var settingsRow = await db.BusinessSettings
+            .AsNoTracking()
+            .Where(x => x.BusinessId == businessId)
+            .Select(x => new
+            {
+                x.LeaveEntitlementByTypeJson,
+                x.CompensationLeaveByEmployeeJson,
+            })
+            .FirstOrDefaultAsync(ct);
+
+        var leaveQuota = ResolveLeaveQuota(
+            settingsRow?.LeaveEntitlementByTypeJson,
+            settingsRow?.CompensationLeaveByEmployeeJson,
+            leaveType,
+            request.EmployeeId);
 
         var created = new LeaveRequestDto(
             Id: Guid.NewGuid(),
             BusinessId: businessId,
             EmployeeId: request.EmployeeId,
             EmployeeName: $"Employee {request.EmployeeId.ToString()[..8]}",
-            LeaveType: request.LeaveType.Trim(),
+            LeaveType: leaveType,
             StartDate: request.StartDate,
             EndDate: request.EndDate,
             TotalDays: totalDays,
@@ -65,10 +84,27 @@ public sealed class InMemoryHrLeaveService : IHrLeaveService
         var list = LeaveByBusiness.GetOrAdd(businessId, _ => []);
         lock (list)
         {
+            if (leaveQuota.HasValue)
+            {
+                var consumedDays = list
+                    .Where(x => x.EmployeeId == request.EmployeeId)
+                    .Where(x => x.LeaveType.Equals(leaveType, StringComparison.OrdinalIgnoreCase))
+                    .Where(x => x.Status.Equals("Pending", StringComparison.OrdinalIgnoreCase)
+                             || x.Status.Equals("Approved", StringComparison.OrdinalIgnoreCase))
+                    .Sum(x => x.TotalDays);
+
+                var remainingDays = leaveQuota.Value - consumedDays;
+                if (totalDays > remainingDays)
+                {
+                    throw new InvalidOperationException(
+                        $"{leaveType} leave quota exceeded. Remaining days: {Math.Max(0, remainingDays)}.");
+                }
+            }
+
             list.Add(created);
         }
 
-        return Task.FromResult(created);
+        return created;
     }
 
     public Task<LeaveRequestDto> ApproveAsync(
@@ -123,6 +159,74 @@ public sealed class InMemoryHrLeaveService : IHrLeaveService
 
             list[idx] = updated;
             return Task.FromResult(updated);
+        }
+    }
+
+    private static bool IsCompensationLeaveType(string leaveType)
+        => leaveType.Equals("Compensation Leave", StringComparison.OrdinalIgnoreCase);
+
+    private static int? ResolveLeaveQuota(
+        string? leaveByTypeJson,
+        string? compensationByEmployeeJson,
+        string leaveType,
+        Guid employeeId)
+    {
+        if (IsCompensationLeaveType(leaveType))
+        {
+            return ResolveCompensationQuota(compensationByEmployeeJson, employeeId) ?? 0;
+        }
+
+        return ResolveLeaveTypeQuota(leaveByTypeJson, leaveType);
+    }
+
+    private static int? ResolveLeaveTypeQuota(string? rawJson, string leaveType)
+    {
+        if (string.IsNullOrWhiteSpace(rawJson))
+            return null;
+
+        try
+        {
+            var map = JsonSerializer.Deserialize<Dictionary<string, int>>(rawJson);
+            if (map is null)
+                return null;
+
+            foreach (var item in map)
+            {
+                if (item.Key.Equals(leaveType, StringComparison.OrdinalIgnoreCase))
+                    return Math.Max(0, item.Value);
+            }
+
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static int? ResolveCompensationQuota(string? rawJson, Guid employeeId)
+    {
+        if (string.IsNullOrWhiteSpace(rawJson))
+            return null;
+
+        try
+        {
+            var map = JsonSerializer.Deserialize<Dictionary<string, int>>(rawJson);
+            if (map is null)
+                return null;
+
+            var employeeIdText = employeeId.ToString();
+            foreach (var item in map)
+            {
+                if (item.Key.Equals(employeeIdText, StringComparison.OrdinalIgnoreCase))
+                    return Math.Max(0, item.Value);
+            }
+
+            return null;
+        }
+        catch
+        {
+            return null;
         }
     }
 }

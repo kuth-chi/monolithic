@@ -27,8 +27,29 @@ public sealed class HrLeaveRequestsController(IHrLeaveService leaveService) : Co
         [FromBody] CreateLeaveRequest request,
         CancellationToken ct)
     {
-        var created = await leaveService.CreateAsync(businessId, request, ct);
-        return Ok(created);
+        try
+        {
+            var created = await leaveService.CreateAsync(businessId, request, ct);
+            return Ok(created);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "Invalid leave request",
+                Detail = ex.Message,
+                Status = StatusCodes.Status400BadRequest,
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Title = "Leave request validation failed",
+                Detail = ex.Message,
+                Status = StatusCodes.Status400BadRequest,
+            });
+        }
     }
 
     [HttpPost("{leaveRequestId:guid}/approve")]

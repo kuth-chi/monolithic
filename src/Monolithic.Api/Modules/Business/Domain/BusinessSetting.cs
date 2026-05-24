@@ -61,6 +61,19 @@ public class BusinessSetting
     /// </summary>
     public bool AutoImportPublicHolidays { get; set; } = true;
 
+    /// <summary>
+    /// JSON map of leave type to entitlement days (for example: {"Annual": 18, "Sick": 10}).
+    /// Null means entitlement limits are not configured.
+    /// </summary>
+    public string? LeaveEntitlementByTypeJson { get; set; }
+
+    /// <summary>
+    /// JSON map of employee id to compensation leave days
+    /// (for example: {"employee-guid": 2}).
+    /// Null means compensation leave is not assigned per employee.
+    /// </summary>
+    public string? CompensationLeaveByEmployeeJson { get; set; }
+
     // ── Attendance ────────────────────────────────────────────────────────────
 
     /// <summary>Default shift start time (local time of the branch). Used when no per-branch policy applies.</summary>

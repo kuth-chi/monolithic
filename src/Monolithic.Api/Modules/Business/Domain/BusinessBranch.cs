@@ -74,6 +74,18 @@ public class BusinessBranch
     /// <summary>Branch-level attendance policies.</summary>
     public virtual ICollection<AttendancePolicy> AttendancePolicies { get; set; } = [];
 
+    /// <summary>Branch-scoped shift templates.</summary>
+    public virtual ICollection<ShiftTemplate> ShiftTemplates { get; set; } = [];
+
+    /// <summary>Branch-scoped shift assignments.</summary>
+    public virtual ICollection<ShiftAssignment> ShiftAssignments { get; set; } = [];
+
+    /// <summary>Branch-scoped calendar day records.</summary>
+    public virtual ICollection<WorkCalendarDay> WorkCalendarDays { get; set; } = [];
+
+    /// <summary>Branch-scoped day-level calendar overrides.</summary>
+    public virtual ICollection<CalendarOverride> CalendarOverrides { get; set; } = [];
+
     /// <summary>Employees assigned to this branch.</summary>
     public virtual ICollection<BranchEmployee> BranchEmployees { get; set; } = [];
 }

@@ -99,6 +99,10 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
     public DbSet<BusinessDomain.BusinessMedia> BusinessMedia => Set<BusinessDomain.BusinessMedia>();
     public DbSet<BusinessDomain.BusinessHoliday> BusinessHolidays => Set<BusinessDomain.BusinessHoliday>();
     public DbSet<BusinessDomain.AttendancePolicy> AttendancePolicies => Set<BusinessDomain.AttendancePolicy>();
+    public DbSet<BusinessDomain.ShiftTemplate> ShiftTemplates => Set<BusinessDomain.ShiftTemplate>();
+    public DbSet<BusinessDomain.ShiftAssignment> ShiftAssignments => Set<BusinessDomain.ShiftAssignment>();
+    public DbSet<BusinessDomain.WorkCalendarDay> WorkCalendarDays => Set<BusinessDomain.WorkCalendarDay>();
+    public DbSet<BusinessDomain.CalendarOverride> CalendarOverrides => Set<BusinessDomain.CalendarOverride>();
 
     // General Ledger
     public DbSet<BusinessDomain.JournalEntry> JournalEntries => Set<BusinessDomain.JournalEntry>();
@@ -176,8 +180,8 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
                 continue;
 
             var parameter = Expression.Parameter(entityType.ClrType, "e");
-            var property  = Expression.Property(parameter, nameof(ISoftDeletable.IsDeleted));
-            var condition  = Expression.Lambda(Expression.Not(property), parameter);
+            var property = Expression.Property(parameter, nameof(ISoftDeletable.IsDeleted));
+            var condition = Expression.Lambda(Expression.Not(property), parameter);
             modelBuilder.Entity(entityType.ClrType).HasQueryFilter(condition);
         }
 
@@ -205,6 +209,14 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
         modelBuilder.Entity<BusinessDomain.BusinessSetting>()
             .HasQueryFilter(e => !e.Business.IsDeleted);
         modelBuilder.Entity<BusinessDomain.AttendancePolicy>()
+            .HasQueryFilter(e => !e.Business.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.ShiftTemplate>()
+            .HasQueryFilter(e => !e.Business.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.ShiftAssignment>()
+            .HasQueryFilter(e => !e.Business.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.WorkCalendarDay>()
+            .HasQueryFilter(e => !e.Business.IsDeleted);
+        modelBuilder.Entity<BusinessDomain.CalendarOverride>()
             .HasQueryFilter(e => !e.Business.IsDeleted);
         modelBuilder.Entity<BusinessDomain.VendorClass>()
             .HasQueryFilter(e => !e.Business.IsDeleted);
@@ -413,7 +425,7 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
             entity.Property(e => e.StateProvince).HasMaxLength(100);
             entity.Property(e => e.Country).HasMaxLength(100);
             entity.Property(e => e.PostalCode).HasMaxLength(20);
-            
+
             entity.HasOne(e => e.PrimaryContact)
                 .WithMany()
                 .HasForeignKey(e => e.PrimaryContactId)
@@ -447,7 +459,7 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
         {
             entity.HasKey(e => new { e.BusinessId, e.ContactId });
             entity.Property(e => e.Role).HasMaxLength(100);
-            
+
             entity.HasOne(e => e.Business)
                 .WithMany(b => b.BusinessContacts)
                 .HasForeignKey(e => e.BusinessId)
@@ -1184,6 +1196,8 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
             entity.Property(e => e.DisplayCurrencyCode).HasMaxLength(3).IsRequired();
             entity.Property(e => e.Locale).HasMaxLength(20).IsRequired();
             entity.Property(e => e.HolidayCountryCode).HasMaxLength(5);
+            entity.Property(e => e.LeaveEntitlementByTypeJson).HasMaxLength(4000);
+            entity.Property(e => e.CompensationLeaveByEmployeeJson).HasMaxLength(4000);
             entity.HasOne(e => e.Business)
                 .WithOne(b => b.Settings)
                 .HasForeignKey<BusinessDomain.BusinessSetting>(e => e.BusinessId)
@@ -1245,6 +1259,104 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
                 .OnDelete(DeleteBehavior.Cascade)
                 .IsRequired(false);
             entity.HasIndex(e => new { e.BusinessId, e.BranchId, e.Scope });
+        });
+
+        // ── ShiftTemplate ────────────────────────────────────────────────────
+        modelBuilder.Entity<BusinessDomain.ShiftTemplate>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.Type).HasConversion<string>().HasMaxLength(30);
+
+            entity.HasOne(e => e.Business)
+                .WithMany(b => b.ShiftTemplates)
+                .HasForeignKey(e => e.BusinessId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Branch)
+                .WithMany(br => br.ShiftTemplates)
+                .HasForeignKey(e => e.BranchId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired(false);
+
+            entity.HasIndex(e => new { e.BusinessId, e.BranchId, e.Name }).IsUnique();
+            entity.HasIndex(e => new { e.BusinessId, e.IsActive });
+        });
+
+        // ── ShiftAssignment ──────────────────────────────────────────────────
+        modelBuilder.Entity<BusinessDomain.ShiftAssignment>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Scope).HasConversion<string>().HasMaxLength(30);
+            entity.Property(e => e.Department).HasMaxLength(100);
+
+            entity.HasOne(e => e.Business)
+                .WithMany(b => b.ShiftAssignments)
+                .HasForeignKey(e => e.BusinessId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Branch)
+                .WithMany(br => br.ShiftAssignments)
+                .HasForeignKey(e => e.BranchId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired(false);
+
+            entity.HasOne(e => e.ShiftTemplate)
+                .WithMany(t => t.Assignments)
+                .HasForeignKey(e => e.ShiftTemplateId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.BusinessId, e.Scope, e.BranchId, e.Department, e.EmployeeId, e.EffectiveFrom });
+            entity.HasIndex(e => new { e.BusinessId, e.IsActive, e.EffectiveFrom, e.EffectiveTo });
+        });
+
+        // ── WorkCalendarDay ──────────────────────────────────────────────────
+        modelBuilder.Entity<BusinessDomain.WorkCalendarDay>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.DayType).HasConversion<string>().HasMaxLength(30);
+            entity.Property(e => e.Name).HasMaxLength(200);
+            entity.Property(e => e.Description).HasMaxLength(500);
+            entity.Property(e => e.CountryCode).HasMaxLength(5);
+            entity.Property(e => e.ExternalId).HasMaxLength(100);
+
+            entity.HasOne(e => e.Business)
+                .WithMany(b => b.WorkCalendarDays)
+                .HasForeignKey(e => e.BusinessId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Branch)
+                .WithMany(br => br.WorkCalendarDays)
+                .HasForeignKey(e => e.BranchId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired(false);
+
+            entity.HasIndex(e => new { e.BusinessId, e.BranchId, e.Date }).IsUnique();
+            entity.HasIndex(e => new { e.BusinessId, e.Date, e.DayType });
+        });
+
+        // ── CalendarOverride ─────────────────────────────────────────────────
+        modelBuilder.Entity<BusinessDomain.CalendarOverride>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.OverrideType).HasConversion<string>().HasMaxLength(30);
+            entity.Property(e => e.Source).HasConversion<string>().HasMaxLength(30);
+            entity.Property(e => e.Reason).HasMaxLength(500).IsRequired();
+
+            entity.HasOne(e => e.Business)
+                .WithMany(b => b.CalendarOverrides)
+                .HasForeignKey(e => e.BusinessId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Branch)
+                .WithMany(br => br.CalendarOverrides)
+                .HasForeignKey(e => e.BranchId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired(false);
+
+            entity.HasIndex(e => new { e.BusinessId, e.BranchId, e.Date, e.IsActive });
+            entity.HasIndex(e => new { e.BusinessId, e.Date, e.OverrideType });
         });
 
         // Configure InventoryItem

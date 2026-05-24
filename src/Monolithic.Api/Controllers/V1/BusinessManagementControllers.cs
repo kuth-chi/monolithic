@@ -223,3 +223,86 @@ public sealed class AttendancePoliciesController(IAttendancePolicyService policy
         return result is null ? NotFound("No attendance policy could be resolved.") : Ok(result);
     }
 }
+
+/// <summary>
+/// Phase-2 workforce scheduling APIs for shift templates and effective assignments.
+/// </summary>
+[ApiController]
+[Route("api/v1/businesses/{businessId:guid}/workforce-scheduling")]
+public sealed class WorkforceSchedulingController(IWorkforceSchedulingService schedulingService) : ControllerBase
+{
+    [HttpGet("templates")]
+    [RequirePermission("business:read")]
+    public async Task<IActionResult> GetTemplates(
+        Guid businessId,
+        [FromQuery] Guid? branchId,
+        [FromQuery] bool? isActive,
+        CancellationToken ct)
+        => Ok(await schedulingService.GetTemplatesAsync(businessId, branchId, isActive, ct));
+
+    [HttpPut("templates")]
+    [RequirePermission("business:write")]
+    public async Task<IActionResult> UpsertTemplate(
+        Guid businessId,
+        [FromBody] UpsertShiftTemplateRequest request,
+        CancellationToken ct)
+    {
+        if (request.BusinessId != businessId) return BadRequest("BusinessId mismatch.");
+        return Ok(await schedulingService.UpsertTemplateAsync(request, ct));
+    }
+
+    [HttpDelete("templates/{templateId:guid}")]
+    [RequirePermission("business:write")]
+    public async Task<IActionResult> DeleteTemplate(Guid businessId, Guid templateId, CancellationToken ct)
+    {
+        await schedulingService.DeleteTemplateAsync(templateId, ct);
+        return NoContent();
+    }
+
+    [HttpGet("assignments")]
+    [RequirePermission("business:read")]
+    public async Task<IActionResult> GetAssignments(
+        Guid businessId,
+        [FromQuery] Guid? branchId,
+        [FromQuery] Guid? employeeId,
+        [FromQuery] DateOnly? onDate,
+        [FromQuery] bool? isActive,
+        CancellationToken ct)
+        => Ok(await schedulingService.GetAssignmentsAsync(businessId, branchId, employeeId, onDate, isActive, ct));
+
+    [HttpPut("assignments")]
+    [RequirePermission("business:write")]
+    public async Task<IActionResult> UpsertAssignment(
+        Guid businessId,
+        [FromBody] UpsertShiftAssignmentRequest request,
+        CancellationToken ct)
+    {
+        if (request.BusinessId != businessId) return BadRequest("BusinessId mismatch.");
+        return Ok(await schedulingService.UpsertAssignmentAsync(request, ct));
+    }
+
+    [HttpDelete("assignments/{assignmentId:guid}")]
+    [RequirePermission("business:write")]
+    public async Task<IActionResult> DeleteAssignment(Guid businessId, Guid assignmentId, CancellationToken ct)
+    {
+        await schedulingService.DeleteAssignmentAsync(assignmentId, ct);
+        return NoContent();
+    }
+
+    [HttpGet("resolve/employees/{employeeId:guid}")]
+    [RequirePermission("business:read")]
+    public async Task<IActionResult> ResolveForEmployee(
+        Guid businessId,
+        Guid employeeId,
+        [FromQuery] DateOnly? onDate,
+        CancellationToken ct)
+    {
+        var resolved = await schedulingService.ResolveForEmployeeAsync(
+            businessId,
+            employeeId,
+            onDate ?? DateOnly.FromDateTime(DateTime.UtcNow),
+            ct);
+
+        return resolved is null ? NotFound("No shift assignment could be resolved.") : Ok(resolved);
+    }
+}

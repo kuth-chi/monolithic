@@ -154,3 +154,37 @@ public interface IAttendancePolicyService
     /// </summary>
     Task<AttendancePolicyDto?> ResolveForEmployeeAsync(Guid businessId, Guid employeeId, CancellationToken ct = default);
 }
+
+/// <summary>
+/// Manages phase-2 workforce scheduling artifacts (shift templates and assignments).
+/// </summary>
+public interface IWorkforceSchedulingService
+{
+    Task<IReadOnlyList<ShiftTemplateDto>> GetTemplatesAsync(
+        Guid businessId,
+        Guid? branchId,
+        bool? isActive,
+        CancellationToken ct = default);
+
+    Task<ShiftTemplateDto> UpsertTemplateAsync(UpsertShiftTemplateRequest request, CancellationToken ct = default);
+
+    Task DeleteTemplateAsync(Guid templateId, CancellationToken ct = default);
+
+    Task<IReadOnlyList<ShiftAssignmentDto>> GetAssignmentsAsync(
+        Guid businessId,
+        Guid? branchId,
+        Guid? employeeId,
+        DateOnly? onDate,
+        bool? isActive,
+        CancellationToken ct = default);
+
+    Task<ShiftAssignmentDto> UpsertAssignmentAsync(UpsertShiftAssignmentRequest request, CancellationToken ct = default);
+
+    Task DeleteAssignmentAsync(Guid assignmentId, CancellationToken ct = default);
+
+    Task<ShiftAssignmentDto?> ResolveForEmployeeAsync(
+        Guid businessId,
+        Guid employeeId,
+        DateOnly onDate,
+        CancellationToken ct = default);
+}

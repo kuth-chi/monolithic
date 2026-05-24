@@ -74,6 +74,10 @@ public interface IApplicationDbContext
     DbSet<BusinessDomain.BusinessMedia> BusinessMedia { get; }
     DbSet<BusinessDomain.BusinessHoliday> BusinessHolidays { get; }
     DbSet<BusinessDomain.AttendancePolicy> AttendancePolicies { get; }
+    DbSet<BusinessDomain.ShiftTemplate> ShiftTemplates { get; }
+    DbSet<BusinessDomain.ShiftAssignment> ShiftAssignments { get; }
+    DbSet<BusinessDomain.WorkCalendarDay> WorkCalendarDays { get; }
+    DbSet<BusinessDomain.CalendarOverride> CalendarOverrides { get; }
     DbSet<BusinessDomain.JournalEntry> JournalEntries { get; }
     DbSet<BusinessDomain.JournalEntryLine> JournalEntryLines { get; }
     DbSet<BusinessDomain.JournalEntryAuditLog> JournalEntryAuditLogs { get; }

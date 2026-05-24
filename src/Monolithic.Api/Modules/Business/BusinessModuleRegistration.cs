@@ -39,6 +39,7 @@ public static class BusinessModuleRegistration
         services.AddScoped<IBusinessMediaService, BusinessMediaService>();
         services.AddScoped<IBusinessHolidayService, BusinessHolidayService>();
         services.AddScoped<IAttendancePolicyService, AttendancePolicyService>();
+        services.AddScoped<IWorkforceSchedulingService, WorkforceSchedulingService>();
 
         // ── GitHub-backed License Activation ────────────────────────────────
         // HttpClient is managed by IHttpClientFactory; retry policy can be added here.

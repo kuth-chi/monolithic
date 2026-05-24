@@ -131,6 +131,18 @@ public class Business : BusinessPartyBase
     /// <summary>Attendance policies (business-wide defaults).</summary>
     public virtual ICollection<AttendancePolicy> AttendancePolicies { get; set; } = [];
 
+    /// <summary>Reusable shift templates available in this business.</summary>
+    public virtual ICollection<ShiftTemplate> ShiftTemplates { get; set; } = [];
+
+    /// <summary>Effective-dated shift assignments for business scheduling.</summary>
+    public virtual ICollection<ShiftAssignment> ShiftAssignments { get; set; } = [];
+
+    /// <summary>Resolved working/public holiday day records for payroll windows.</summary>
+    public virtual ICollection<WorkCalendarDay> WorkCalendarDays { get; set; } = [];
+
+    /// <summary>Explicit overrides that supersede base calendar day records.</summary>
+    public virtual ICollection<CalendarOverride> CalendarOverrides { get; set; } = [];
+
     /// <summary>Ownership records (who owns this business).</summary>
     public virtual ICollection<BusinessOwnership> Ownerships { get; set; } = [];
 }

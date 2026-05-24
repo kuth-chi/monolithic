@@ -314,6 +314,8 @@ public sealed record BusinessSettingDto(
     bool ManagerCanViewAttendance,
     bool EmployeeCanViewOwnAttendance,
     int DefaultReportRangeDays,
+    IReadOnlyDictionary<string, int>? LeaveDaysByType,
+    IReadOnlyDictionary<string, int>? CompensationLeaveDaysByEmployee,
     DateTimeOffset? ModifiedAtUtc);
 
 public sealed record UpsertBusinessSettingRequest(
@@ -333,7 +335,9 @@ public sealed record UpsertBusinessSettingRequest(
     int LateGraceMinutes,
     bool ManagerCanViewAttendance,
     bool EmployeeCanViewOwnAttendance,
-    int DefaultReportRangeDays);
+    int DefaultReportRangeDays,
+    IReadOnlyDictionary<string, int>? LeaveDaysByType = null,
+    IReadOnlyDictionary<string, int>? CompensationLeaveDaysByEmployee = null);
 
 // ── Business Media ────────────────────────────────────────────────────────────
 
@@ -417,6 +421,69 @@ public sealed record UpsertAttendancePolicyRequest(
     bool EmployeeCanViewOwn,
     bool ManagerCanView,
     bool HrCanView);
+
+// ── Workforce Scheduling ─────────────────────────────────────────────────────
+
+public sealed record ShiftTemplateDto(
+    Guid Id,
+    Guid BusinessId,
+    Guid? BranchId,
+    string? BranchName,
+    string Name,
+    string? Description,
+    ShiftTemplateType Type,
+    TimeOnly ShiftStart,
+    TimeOnly ShiftEnd,
+    int BreakMinutes,
+    int LateGraceMinutes,
+    int OvertimeThresholdMinutes,
+    bool IsActive,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset? ModifiedAtUtc);
+
+public sealed record UpsertShiftTemplateRequest(
+    Guid BusinessId,
+    Guid? TemplateId,
+    Guid? BranchId,
+    string Name,
+    string? Description,
+    ShiftTemplateType Type,
+    TimeOnly ShiftStart,
+    TimeOnly ShiftEnd,
+    int BreakMinutes,
+    int LateGraceMinutes,
+    int OvertimeThresholdMinutes,
+    bool IsActive);
+
+public sealed record ShiftAssignmentDto(
+    Guid Id,
+    Guid BusinessId,
+    Guid ShiftTemplateId,
+    string ShiftTemplateName,
+    Guid? BranchId,
+    string? BranchName,
+    Guid? EmployeeId,
+    string? Department,
+    ShiftAssignmentScope Scope,
+    DateOnly EffectiveFrom,
+    DateOnly? EffectiveTo,
+    bool IsPrimary,
+    bool IsActive,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset? ModifiedAtUtc);
+
+public sealed record UpsertShiftAssignmentRequest(
+    Guid BusinessId,
+    Guid? AssignmentId,
+    Guid ShiftTemplateId,
+    Guid? BranchId,
+    Guid? EmployeeId,
+    string? Department,
+    ShiftAssignmentScope Scope,
+    DateOnly EffectiveFrom,
+    DateOnly? EffectiveTo,
+    bool IsPrimary,
+    bool IsActive);
 
 // ── Cross-business Reporting ──────────────────────────────────────────────────
 

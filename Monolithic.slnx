@@ -2,4 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Monolithic.Api/Monolithic.Api.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Monolithic.Api.Tests/Monolithic.Api.Tests.csproj" />
+  </Folder>
 </Solution>

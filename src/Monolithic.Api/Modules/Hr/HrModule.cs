@@ -24,8 +24,9 @@ public sealed class HrModule : ModuleBase
         yield return Nav("employees", "Employees", "/hr/employees", UiContext.Operation, icon: "user-group", order: 71, parentKey: "hr.root", requiredPermissions: ["hr:employees:read"]);
         yield return Nav("attendance", "Attendance", "/hr/attendance", UiContext.Operation, icon: "clock", order: 72, parentKey: "hr.root", requiredPermissions: ["hr:attendance:read"]);
         yield return Nav("leave", "Leave Management", "/hr/leave", UiContext.Operation, icon: "calendar-days", order: 73, parentKey: "hr.root", requiredPermissions: ["hr:leave:read"]);
-        yield return Nav("payroll", "Payroll", "/hr/payroll", UiContext.Operation, icon: "banknotes", order: 74, parentKey: "hr.root", requiredPermissions: ["hr:payroll:read"]);
-        yield return Nav("org", "Org Structure", "/hr/org-structure", UiContext.Operation, icon: "squares-2x2", order: 75, parentKey: "hr.root", requiredPermissions: ["hr:org:read"]);
+        yield return Nav("calendar-overview", "Calendar Overview", "/hr/calendar-overview", UiContext.Operation, icon: "calendar-days", order: 74, parentKey: "hr.root", requiredPermissions: ["hr:attendance:read"]);
+        yield return Nav("payroll", "Payroll", "/hr/payroll", UiContext.Operation, icon: "banknotes", order: 75, parentKey: "hr.root", requiredPermissions: ["hr:payroll:read"]);
+        yield return Nav("org", "Org Structure", "/hr/org-structure", UiContext.Operation, icon: "squares-2x2", order: 76, parentKey: "hr.root", requiredPermissions: ["hr:org:read"]);
     }
 
     public override IEnumerable<PermissionDescriptor> GetPermissions()

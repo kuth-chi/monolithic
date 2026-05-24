@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using Monolithic.Api.Common.Caching;
 using Monolithic.Api.Common.Errors;
 using Monolithic.Api.Common.Pagination;
@@ -16,6 +17,78 @@ namespace Monolithic.Api.Modules.Business.Application;
 
 file static class BusinessManagementMapper
 {
+    public static IReadOnlyDictionary<string, int>? ParseLeaveDaysByType(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<Dictionary<string, int>>(value);
+            if (parsed is null || parsed.Count == 0)
+                return null;
+
+            return parsed
+                .Where(x => !string.IsNullOrWhiteSpace(x.Key) && x.Value >= 0)
+                .ToDictionary(x => x.Key.Trim(), x => x.Value, StringComparer.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public static string? SerializeLeaveDaysByType(IReadOnlyDictionary<string, int>? value)
+    {
+        if (value is null)
+            return null;
+
+        var normalized = value
+            .Where(x => !string.IsNullOrWhiteSpace(x.Key) && x.Value >= 0)
+            .ToDictionary(x => x.Key.Trim(), x => x.Value, StringComparer.OrdinalIgnoreCase);
+
+        if (normalized.Count == 0)
+            return null;
+
+        return JsonSerializer.Serialize(normalized);
+    }
+
+    public static IReadOnlyDictionary<string, int>? ParseCompensationLeaveByEmployee(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<Dictionary<string, int>>(value);
+            if (parsed is null || parsed.Count == 0)
+                return null;
+
+            return parsed
+                .Where(x => Guid.TryParse(x.Key, out _) && x.Value >= 0)
+                .ToDictionary(x => x.Key.Trim(), x => x.Value, StringComparer.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public static string? SerializeCompensationLeaveByEmployee(IReadOnlyDictionary<string, int>? value)
+    {
+        if (value is null)
+            return null;
+
+        var normalized = value
+            .Where(x => Guid.TryParse(x.Key, out _) && x.Value >= 0)
+            .ToDictionary(x => x.Key.Trim(), x => x.Value, StringComparer.OrdinalIgnoreCase);
+
+        if (normalized.Count == 0)
+            return null;
+
+        return JsonSerializer.Serialize(normalized);
+    }
+
     public static BusinessLicenseDto ToDto(this BusinessLicense l) => new(
         l.Id, l.OwnerId, l.Plan, l.Status,
         l.MaxBusinesses, l.MaxBranchesPerBusiness, l.MaxEmployees,
@@ -39,7 +112,10 @@ file static class BusinessManagementMapper
         s.WeekStartDay, s.FiscalYearStartMonth, s.HolidayCountryCode,
         s.AutoImportPublicHolidays, s.DefaultShiftStart, s.DefaultShiftEnd,
         s.LateGraceMinutes, s.ManagerCanViewAttendance, s.EmployeeCanViewOwnAttendance,
-        s.DefaultReportRangeDays, s.ModifiedAtUtc);
+        s.DefaultReportRangeDays,
+        ParseLeaveDaysByType(s.LeaveEntitlementByTypeJson),
+        ParseCompensationLeaveByEmployee(s.CompensationLeaveByEmployeeJson),
+        s.ModifiedAtUtc);
 
     public static BusinessMediaDto ToDto(this BusinessMedia m) => new(
         m.Id, m.BusinessId, m.MediaType, m.StoragePath, m.PublicUrl,
@@ -56,6 +132,40 @@ file static class BusinessManagementMapper
         p.ShiftStart, p.ShiftEnd, p.BreakMinutes, p.LateGraceMinutes,
         p.RequiredHoursPerDay, p.WorkingDaysMask,
         p.EmployeeCanViewOwn, p.ManagerCanView, p.HrCanView, p.IsActive);
+
+    public static ShiftTemplateDto ToDto(this ShiftTemplate t, string? branchName = null) => new(
+        t.Id,
+        t.BusinessId,
+        t.BranchId,
+        branchName,
+        t.Name,
+        t.Description,
+        t.Type,
+        t.ShiftStart,
+        t.ShiftEnd,
+        t.BreakMinutes,
+        t.LateGraceMinutes,
+        t.OvertimeThresholdMinutes,
+        t.IsActive,
+        t.CreatedAtUtc,
+        t.ModifiedAtUtc);
+
+    public static ShiftAssignmentDto ToDto(this ShiftAssignment a) => new(
+        a.Id,
+        a.BusinessId,
+        a.ShiftTemplateId,
+        a.ShiftTemplate.Name,
+        a.BranchId,
+        a.Branch?.Name,
+        a.EmployeeId,
+        a.Department,
+        a.Scope,
+        a.EffectiveFrom,
+        a.EffectiveTo,
+        a.IsPrimary,
+        a.IsActive,
+        a.CreatedAtUtc,
+        a.ModifiedAtUtc);
 }
 
 // ── BusinessLicenseService ────────────────────────────────────────────────────
@@ -1169,6 +1279,13 @@ public sealed class BusinessSettingService(ApplicationDbContext db) : IBusinessS
         s.EmployeeCanViewOwnAttendance = req.EmployeeCanViewOwnAttendance;
         s.DefaultReportRangeDays = req.DefaultReportRangeDays;
 
+        if (req.LeaveDaysByType is not null)
+            s.LeaveEntitlementByTypeJson = BusinessManagementMapper.SerializeLeaveDaysByType(req.LeaveDaysByType);
+
+        if (req.CompensationLeaveDaysByEmployee is not null)
+            s.CompensationLeaveByEmployeeJson =
+                BusinessManagementMapper.SerializeCompensationLeaveByEmployee(req.CompensationLeaveDaysByEmployee);
+
         await db.SaveChangesAsync(ct);
         return s.ToDto();
     }
@@ -1430,5 +1547,240 @@ public sealed class AttendancePolicyService(ApplicationDbContext db) : IAttendan
             ?? policies.FirstOrDefault(p => p.BranchId == null);
 
         return resolved?.ToDto(resolved.Branch?.Name);
+    }
+}
+
+// ── WorkforceSchedulingService ───────────────────────────────────────────────
+
+public sealed class WorkforceSchedulingService(ApplicationDbContext db) : IWorkforceSchedulingService
+{
+    public async Task<IReadOnlyList<ShiftTemplateDto>> GetTemplatesAsync(
+        Guid businessId,
+        Guid? branchId,
+        bool? isActive,
+        CancellationToken ct = default)
+    {
+        var query = db.ShiftTemplates
+            .Include(t => t.Branch)
+            .Where(t => t.BusinessId == businessId)
+            .AsQueryable();
+
+        if (branchId.HasValue)
+            query = query.Where(t => t.BranchId == branchId.Value);
+        if (isActive.HasValue)
+            query = query.Where(t => t.IsActive == isActive.Value);
+
+        return await query
+            .OrderBy(t => t.Name)
+            .Select(t => t.ToDto(t.Branch != null ? t.Branch.Name : null))
+            .ToListAsync(ct);
+    }
+
+    public async Task<ShiftTemplateDto> UpsertTemplateAsync(UpsertShiftTemplateRequest request, CancellationToken ct = default)
+    {
+        ShiftTemplate? template = null;
+
+        if (request.TemplateId.HasValue && request.TemplateId.Value != Guid.Empty)
+        {
+            template = await db.ShiftTemplates
+                .FirstOrDefaultAsync(t => t.Id == request.TemplateId.Value && t.BusinessId == request.BusinessId, ct);
+        }
+
+        if (template is null)
+        {
+            template = new ShiftTemplate
+            {
+                Id = request.TemplateId is { } tid && tid != Guid.Empty ? tid : Guid.NewGuid(),
+                BusinessId = request.BusinessId,
+            };
+            db.ShiftTemplates.Add(template);
+        }
+        else
+        {
+            template.ModifiedAtUtc = DateTimeOffset.UtcNow;
+        }
+
+        template.BranchId = request.BranchId;
+        template.Name = request.Name.Trim();
+        template.Description = request.Description;
+        template.Type = request.Type;
+        template.ShiftStart = request.ShiftStart;
+        template.ShiftEnd = request.ShiftEnd;
+        template.BreakMinutes = Math.Max(0, request.BreakMinutes);
+        template.LateGraceMinutes = Math.Max(0, request.LateGraceMinutes);
+        template.OvertimeThresholdMinutes = Math.Max(0, request.OvertimeThresholdMinutes);
+        template.IsActive = request.IsActive;
+
+        await db.SaveChangesAsync(ct);
+
+        var branchName = template.BranchId.HasValue
+            ? await db.BusinessBranches
+                .Where(b => b.Id == template.BranchId.Value)
+                .Select(b => b.Name)
+                .FirstOrDefaultAsync(ct)
+            : null;
+
+        return template.ToDto(branchName);
+    }
+
+    public async Task DeleteTemplateAsync(Guid templateId, CancellationToken ct = default)
+    {
+        var template = await db.ShiftTemplates
+            .FirstOrDefaultAsync(t => t.Id == templateId, ct)
+            ?? throw new KeyNotFoundException("Shift template not found.");
+
+        template.IsActive = false;
+        template.ModifiedAtUtc = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<ShiftAssignmentDto>> GetAssignmentsAsync(
+        Guid businessId,
+        Guid? branchId,
+        Guid? employeeId,
+        DateOnly? onDate,
+        bool? isActive,
+        CancellationToken ct = default)
+    {
+        var query = db.ShiftAssignments
+            .Include(a => a.ShiftTemplate)
+            .Include(a => a.Branch)
+            .Where(a => a.BusinessId == businessId)
+            .AsQueryable();
+
+        if (branchId.HasValue)
+            query = query.Where(a => a.BranchId == branchId.Value);
+        if (employeeId.HasValue)
+            query = query.Where(a => a.EmployeeId == employeeId.Value);
+        if (isActive.HasValue)
+            query = query.Where(a => a.IsActive == isActive.Value);
+        if (onDate.HasValue)
+        {
+            var date = onDate.Value;
+            query = query.Where(a => a.EffectiveFrom <= date && (a.EffectiveTo == null || a.EffectiveTo >= date));
+        }
+
+        return await query
+            .OrderByDescending(a => a.EffectiveFrom)
+            .ThenBy(a => a.Scope)
+            .Select(a => a.ToDto())
+            .ToListAsync(ct);
+    }
+
+    public async Task<ShiftAssignmentDto> UpsertAssignmentAsync(UpsertShiftAssignmentRequest request, CancellationToken ct = default)
+    {
+        var templateExists = await db.ShiftTemplates.AnyAsync(
+            t => t.Id == request.ShiftTemplateId && t.BusinessId == request.BusinessId,
+            ct);
+
+        if (!templateExists)
+            throw new KeyNotFoundException("Shift template not found in this business.");
+
+        ShiftAssignment? assignment = null;
+
+        if (request.AssignmentId.HasValue && request.AssignmentId.Value != Guid.Empty)
+        {
+            assignment = await db.ShiftAssignments
+                .FirstOrDefaultAsync(a => a.Id == request.AssignmentId.Value && a.BusinessId == request.BusinessId, ct);
+        }
+
+        if (assignment is null)
+        {
+            assignment = new ShiftAssignment
+            {
+                Id = request.AssignmentId is { } aid && aid != Guid.Empty ? aid : Guid.NewGuid(),
+                BusinessId = request.BusinessId,
+            };
+            db.ShiftAssignments.Add(assignment);
+        }
+        else
+        {
+            assignment.ModifiedAtUtc = DateTimeOffset.UtcNow;
+        }
+
+        assignment.ShiftTemplateId = request.ShiftTemplateId;
+        assignment.BranchId = request.BranchId;
+        assignment.EmployeeId = request.EmployeeId;
+        assignment.Department = request.Department;
+        assignment.Scope = request.Scope;
+        assignment.EffectiveFrom = request.EffectiveFrom;
+        assignment.EffectiveTo = request.EffectiveTo;
+        assignment.IsPrimary = request.IsPrimary;
+        assignment.IsActive = request.IsActive;
+
+        await db.SaveChangesAsync(ct);
+
+        var dto = await db.ShiftAssignments
+            .Include(a => a.ShiftTemplate)
+            .Include(a => a.Branch)
+            .Where(a => a.Id == assignment.Id)
+            .Select(a => a.ToDto())
+            .FirstAsync(ct);
+
+        return dto;
+    }
+
+    public async Task DeleteAssignmentAsync(Guid assignmentId, CancellationToken ct = default)
+    {
+        var assignment = await db.ShiftAssignments
+            .FirstOrDefaultAsync(a => a.Id == assignmentId, ct)
+            ?? throw new KeyNotFoundException("Shift assignment not found.");
+
+        assignment.IsActive = false;
+        assignment.ModifiedAtUtc = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task<ShiftAssignmentDto?> ResolveForEmployeeAsync(
+        Guid businessId,
+        Guid employeeId,
+        DateOnly onDate,
+        CancellationToken ct = default)
+    {
+        var employee = await db.Employees
+            .Where(e => e.Id == employeeId && e.BusinessId == businessId)
+            .Select(e => new { e.Department })
+            .FirstOrDefaultAsync(ct);
+
+        if (employee is null)
+            return null;
+
+        var branchId = await db.BranchEmployees
+            .Where(be => be.EmployeeId == employeeId && be.ReleasedOn == null && be.IsPrimary)
+            .Select(be => be.BranchId)
+            .FirstOrDefaultAsync(ct);
+
+        var candidates = await db.ShiftAssignments
+            .Include(a => a.ShiftTemplate)
+            .Include(a => a.Branch)
+            .Where(a =>
+                a.BusinessId == businessId &&
+                a.IsActive &&
+                a.EffectiveFrom <= onDate &&
+                (a.EffectiveTo == null || a.EffectiveTo >= onDate))
+            .ToListAsync(ct);
+
+        var resolved =
+            candidates
+                .Where(a => a.Scope == ShiftAssignmentScope.Employee && a.EmployeeId == employeeId)
+                .OrderByDescending(a => a.EffectiveFrom)
+                .FirstOrDefault()
+            ?? candidates
+                .Where(a =>
+                    a.Scope == ShiftAssignmentScope.Department &&
+                    string.Equals(a.Department, employee.Department, StringComparison.OrdinalIgnoreCase) &&
+                    (!a.BranchId.HasValue || a.BranchId == branchId))
+                .OrderByDescending(a => a.EffectiveFrom)
+                .FirstOrDefault()
+            ?? candidates
+                .Where(a => a.Scope == ShiftAssignmentScope.Branch && a.BranchId == branchId)
+                .OrderByDescending(a => a.EffectiveFrom)
+                .FirstOrDefault()
+            ?? candidates
+                .Where(a => a.Scope == ShiftAssignmentScope.Business)
+                .OrderByDescending(a => a.EffectiveFrom)
+                .FirstOrDefault();
+
+        return resolved?.ToDto();
     }
 }

@@ -6,7 +6,7 @@ public static class HrModuleRegistration
 {
     public static IServiceCollection AddHrModule(this IServiceCollection services)
     {
-        services.AddSingleton<IHrLeaveService, InMemoryHrLeaveService>();
+        services.AddScoped<IHrLeaveService, InMemoryHrLeaveService>();
         services.AddSingleton<IHrAttendanceService, InMemoryHrAttendanceService>();
         services.AddSingleton<IHrPayrollService, InMemoryHrPayrollService>();
         return services;

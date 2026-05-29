@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using System.Text.Json;
 using Monolithic.Api.Common.Caching;
 using Monolithic.Api.Common.Errors;
@@ -143,12 +144,21 @@ file static class BusinessManagementMapper
         t.Type,
         t.ShiftStart,
         t.ShiftEnd,
+        t.BreakStart,
+        t.BreakEnd,
         t.BreakMinutes,
+        t.WorkingDaysMask,
+        t.ExcludePublicHolidays,
         t.LateGraceMinutes,
         t.OvertimeThresholdMinutes,
         t.IsActive,
+        t.IsDefault,
         t.CreatedAtUtc,
-        t.ModifiedAtUtc);
+        t.ModifiedAtUtc,
+        t.CreatedByUserId,
+        t.CreatedByDisplayName,
+        t.ModifiedByUserId,
+        t.ModifiedByDisplayName);
 
     public static ShiftAssignmentDto ToDto(this ShiftAssignment a) => new(
         a.Id,
@@ -1041,6 +1051,11 @@ public sealed class BusinessEmployeeService(
             e.JobTitle,
             e.Department,
             e.Status,
+            db.UserRoles
+                .Where(ur => ur.UserId == e.Id)
+                .Join(db.Roles, ur => ur.RoleId, r => r.Id, (_, r) => r.Name)
+                .OrderBy(name => name)
+                .FirstOrDefault() ?? "Staff",
             e.HiredAtUtc,
             e.TerminatedAtUtc,
             e.IsActive,
@@ -1181,6 +1196,38 @@ public sealed class BusinessEmployeeService(
             });
         }
 
+        var shiftTemplateId = request.ShiftTemplateId;
+        if (!shiftTemplateId.HasValue)
+        {
+            shiftTemplateId = await db.ShiftTemplates
+                .Where(t => t.BusinessId == businessId && t.IsActive && t.IsDefault)
+                .Select(t => (Guid?)t.Id)
+                .FirstOrDefaultAsync(ct);
+        }
+
+        if (shiftTemplateId.HasValue)
+        {
+            var templateExists = await db.ShiftTemplates
+                .AnyAsync(t => t.Id == shiftTemplateId.Value && t.BusinessId == businessId && t.IsActive, ct);
+
+            if (!templateExists)
+                throw new InvalidOperationException("Selected shift template does not belong to this business.");
+
+            db.ShiftAssignments.Add(new ShiftAssignment
+            {
+                Id = Guid.NewGuid(),
+                BusinessId = businessId,
+                ShiftTemplateId = shiftTemplateId.Value,
+                BranchId = branchId,
+                EmployeeId = employee.Id,
+                Scope = ShiftAssignmentScope.Employee,
+                EffectiveFrom = DateOnly.FromDateTime(hiredAt.UtcDateTime),
+                EffectiveTo = null,
+                IsPrimary = true,
+                IsActive = true,
+            });
+        }
+
         await db.SaveChangesAsync(ct);
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -1197,6 +1244,11 @@ public sealed class BusinessEmployeeService(
                 e.JobTitle,
                 e.Department,
                 e.Status,
+                db.UserRoles
+                    .Where(ur => ur.UserId == e.Id)
+                    .Join(db.Roles, ur => ur.RoleId, r => r.Id, (_, r) => r.Name)
+                    .OrderBy(name => name)
+                    .FirstOrDefault() ?? "Staff",
                 e.HiredAtUtc,
                 e.TerminatedAtUtc,
                 e.IsActive,
@@ -1223,6 +1275,186 @@ public sealed class BusinessEmployeeService(
             .FirstAsync(ct);
 
         return created;
+    }
+
+    public Task<BusinessEmployeeDto?> GetByIdAsync(
+        Guid businessId,
+        Guid employeeId,
+        CancellationToken ct = default)
+        => GetEmployeeDtoAsync(businessId, employeeId, ct);
+
+    public async Task<BusinessEmployeeDto> UpdateAsync(
+        Guid businessId,
+        Guid employeeId,
+        UpdateBusinessEmployeeRequest request,
+        CancellationToken ct = default)
+    {
+        var employee = await db.Employees
+            .FirstOrDefaultAsync(e => e.Id == employeeId && e.BusinessId == businessId && !e.IsDeleted, ct)
+            ?? throw new KeyNotFoundException("Employee not found.");
+
+        var roleName = request.RoleName.Trim();
+        if (string.IsNullOrWhiteSpace(roleName))
+            throw new InvalidOperationException("Role is required.");
+
+        var role = await roleManager.FindByNameAsync(roleName)
+            ?? throw new KeyNotFoundException($"Role '{roleName}' was not found.");
+
+        employee.FullName = string.IsNullOrWhiteSpace(request.FullName)
+            ? employee.FullName
+            : request.FullName.Trim();
+        employee.PhoneNumber = string.IsNullOrWhiteSpace(request.PhoneNumber)
+            ? null
+            : request.PhoneNumber.Trim();
+        employee.JobTitle = string.IsNullOrWhiteSpace(request.JobTitle)
+            ? employee.JobTitle
+            : request.JobTitle.Trim();
+        employee.Department = string.IsNullOrWhiteSpace(request.Department)
+            ? employee.Department
+            : request.Department.Trim();
+        employee.Status = string.IsNullOrWhiteSpace(request.Status)
+            ? employee.Status
+            : request.Status.Trim();
+        employee.IsActive = request.IsActive;
+        employee.TerminatedAtUtc = request.IsActive
+            ? null
+            : employee.TerminatedAtUtc ?? DateTimeOffset.UtcNow;
+
+        var updateResult = await userManager.UpdateAsync(employee);
+        if (!updateResult.Succeeded)
+        {
+            var errors = string.Join("; ", updateResult.Errors.Select(e => e.Description));
+            throw new InvalidOperationException($"Failed to update employee: {errors}");
+        }
+
+        var existingRoles = await userManager.GetRolesAsync(employee);
+        var rolesToRemove = existingRoles
+            .Where(r => !string.Equals(r, role.Name, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        if (rolesToRemove.Length > 0)
+        {
+            var removeResult = await userManager.RemoveFromRolesAsync(employee, rolesToRemove);
+            if (!removeResult.Succeeded)
+            {
+                var errors = string.Join("; ", removeResult.Errors.Select(e => e.Description));
+                throw new InvalidOperationException($"Failed to update employee roles: {errors}");
+            }
+        }
+
+        if (!existingRoles.Any(r => string.Equals(r, role.Name, StringComparison.OrdinalIgnoreCase)))
+        {
+            var addResult = await userManager.AddToRoleAsync(employee, role.Name!);
+            if (!addResult.Succeeded)
+            {
+                var errors = string.Join("; ", addResult.Errors.Select(e => e.Description));
+                throw new InvalidOperationException($"Failed to assign role: {errors}");
+            }
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        return await GetEmployeeDtoAsync(businessId, employeeId, ct)
+            ?? throw new KeyNotFoundException("Employee not found.");
+    }
+
+    public async Task<BusinessEmployeeDto> DeactivateAsync(
+        Guid businessId,
+        Guid employeeId,
+        CancellationToken ct = default)
+    {
+        var employee = await db.Employees
+            .FirstOrDefaultAsync(e => e.Id == employeeId && e.BusinessId == businessId && !e.IsDeleted, ct)
+            ?? throw new KeyNotFoundException("Employee not found.");
+
+        employee.IsActive = false;
+        employee.Status = "Inactive";
+        employee.TerminatedAtUtc ??= DateTimeOffset.UtcNow;
+
+        var updateResult = await userManager.UpdateAsync(employee);
+        if (!updateResult.Succeeded)
+        {
+            var errors = string.Join("; ", updateResult.Errors.Select(e => e.Description));
+            throw new InvalidOperationException($"Failed to deactivate employee: {errors}");
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        return await GetEmployeeDtoAsync(businessId, employeeId, ct)
+            ?? throw new KeyNotFoundException("Employee not found.");
+    }
+
+    public async Task DeleteAsync(Guid businessId, Guid employeeId, CancellationToken ct = default)
+    {
+        var employee = await db.Employees
+            .FirstOrDefaultAsync(e => e.Id == employeeId && e.BusinessId == businessId && !e.IsDeleted, ct)
+            ?? throw new KeyNotFoundException("Employee not found.");
+
+        employee.IsDeleted = true;
+        employee.DeletedAtUtc = DateTimeOffset.UtcNow;
+        employee.IsActive = false;
+        employee.Status = "Inactive";
+        employee.TerminatedAtUtc ??= DateTimeOffset.UtcNow;
+
+        var updateResult = await userManager.UpdateAsync(employee);
+        if (!updateResult.Succeeded)
+        {
+            var errors = string.Join("; ", updateResult.Errors.Select(e => e.Description));
+            throw new InvalidOperationException($"Failed to remove employee: {errors}");
+        }
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    private Task<BusinessEmployeeDto?> GetEmployeeDtoAsync(
+        Guid businessId,
+        Guid employeeId,
+        CancellationToken ct)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        return db.Employees
+            .AsNoTracking()
+            .Where(e => e.Id == employeeId && e.BusinessId == businessId && !e.IsDeleted)
+            .Select(e => new BusinessEmployeeDto(
+                e.Id,
+                businessId,
+                e.FullName,
+                e.Email ?? string.Empty,
+                e.PhoneNumber,
+                e.EmployeeNumber,
+                e.JobTitle,
+                e.Department,
+                e.Status,
+                db.UserRoles
+                    .Where(ur => ur.UserId == e.Id)
+                    .Join(db.Roles, ur => ur.RoleId, r => r.Id, (_, r) => r.Name)
+                    .OrderBy(name => name)
+                    .FirstOrDefault() ?? "Staff",
+                e.HiredAtUtc,
+                e.TerminatedAtUtc,
+                e.IsActive,
+                db.BranchEmployees
+                    .Where(be =>
+                        be.EmployeeId == e.Id
+                        && (be.ReleasedOn == null || be.ReleasedOn >= today))
+                    .OrderByDescending(be => be.IsPrimary)
+                    .ThenBy(be => be.AssignedOn)
+                    .Select(be => (Guid?)be.BranchId)
+                    .FirstOrDefault(),
+                db.BranchEmployees
+                    .Where(be =>
+                        be.EmployeeId == e.Id
+                        && (be.ReleasedOn == null || be.ReleasedOn >= today))
+                    .OrderByDescending(be => be.IsPrimary)
+                    .ThenBy(be => be.AssignedOn)
+                    .Select(be => be.Branch.Name)
+                    .FirstOrDefault(),
+                db.BranchEmployees.Count(be =>
+                    be.EmployeeId == e.Id
+                    && (be.ReleasedOn == null || be.ReleasedOn >= today))
+            ))
+            .FirstOrDefaultAsync(ct);
     }
 
     private async Task<string> GenerateNextEmployeeNumberAsync(Guid businessId, CancellationToken ct)
@@ -1552,7 +1784,9 @@ public sealed class AttendancePolicyService(ApplicationDbContext db) : IAttendan
 
 // ── WorkforceSchedulingService ───────────────────────────────────────────────
 
-public sealed class WorkforceSchedulingService(ApplicationDbContext db) : IWorkforceSchedulingService
+public sealed class WorkforceSchedulingService(
+    ApplicationDbContext db,
+    IHttpContextAccessor httpContextAccessor) : IWorkforceSchedulingService
 {
     public async Task<IReadOnlyList<ShiftTemplateDto>> GetTemplatesAsync(
         Guid businessId,
@@ -1588,16 +1822,22 @@ public sealed class WorkforceSchedulingService(ApplicationDbContext db) : IWorkf
 
         if (template is null)
         {
+            var actor = GetActor();
             template = new ShiftTemplate
             {
                 Id = request.TemplateId is { } tid && tid != Guid.Empty ? tid : Guid.NewGuid(),
                 BusinessId = request.BusinessId,
+                CreatedByUserId = actor.userId,
+                CreatedByDisplayName = actor.displayName,
             };
             db.ShiftTemplates.Add(template);
         }
         else
         {
+            var actor = GetActor();
             template.ModifiedAtUtc = DateTimeOffset.UtcNow;
+            template.ModifiedByUserId = actor.userId;
+            template.ModifiedByDisplayName = actor.displayName;
         }
 
         template.BranchId = request.BranchId;
@@ -1606,10 +1846,28 @@ public sealed class WorkforceSchedulingService(ApplicationDbContext db) : IWorkf
         template.Type = request.Type;
         template.ShiftStart = request.ShiftStart;
         template.ShiftEnd = request.ShiftEnd;
+        template.BreakStart = request.BreakStart;
+        template.BreakEnd = request.BreakEnd;
         template.BreakMinutes = Math.Max(0, request.BreakMinutes);
+        template.WorkingDaysMask = request.WorkingDaysMask;
+        template.ExcludePublicHolidays = request.ExcludePublicHolidays;
         template.LateGraceMinutes = Math.Max(0, request.LateGraceMinutes);
         template.OvertimeThresholdMinutes = Math.Max(0, request.OvertimeThresholdMinutes);
         template.IsActive = request.IsActive;
+        template.IsDefault = request.IsDefault;
+
+        if (template.IsDefault)
+        {
+            var otherDefaults = await db.ShiftTemplates
+                .Where(t => t.BusinessId == request.BusinessId && t.Id != template.Id && t.IsDefault)
+                .ToListAsync(ct);
+
+            foreach (var otherDefault in otherDefaults)
+            {
+                otherDefault.IsDefault = false;
+                otherDefault.ModifiedAtUtc = DateTimeOffset.UtcNow;
+            }
+        }
 
         await db.SaveChangesAsync(ct);
 
@@ -1630,6 +1888,7 @@ public sealed class WorkforceSchedulingService(ApplicationDbContext db) : IWorkf
             ?? throw new KeyNotFoundException("Shift template not found.");
 
         template.IsActive = false;
+        template.IsDefault = false;
         template.ModifiedAtUtc = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
     }
@@ -1782,5 +2041,25 @@ public sealed class WorkforceSchedulingService(ApplicationDbContext db) : IWorkf
                 .FirstOrDefault();
 
         return resolved?.ToDto();
+    }
+
+    private (Guid? userId, string? displayName) GetActor()
+    {
+        var principal = httpContextAccessor.HttpContext?.User;
+        if (principal is null)
+            return (null, null);
+
+        Guid? userId = null;
+        var sub = principal.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? principal.FindFirstValue("sub");
+
+        if (Guid.TryParse(sub, out var parsedUserId))
+            userId = parsedUserId;
+
+        var displayName = principal.FindFirstValue("name")
+            ?? principal.FindFirstValue(ClaimTypes.Name)
+            ?? principal.FindFirstValue("email");
+
+        return (userId, displayName);
     }
 }

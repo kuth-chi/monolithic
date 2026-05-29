@@ -34,7 +34,19 @@ public class ShiftTemplate
 
     public TimeOnly ShiftEnd { get; set; } = new(17, 0);
 
+    public TimeOnly? BreakStart { get; set; }
+
+    public TimeOnly? BreakEnd { get; set; }
+
     public int BreakMinutes { get; set; } = 60;
+
+    /// <summary>
+    /// Bitmask aligned to DayOfWeek values (Sunday=bit0 ... Saturday=bit6).
+    /// Default is Monday-Friday.
+    /// </summary>
+    public byte WorkingDaysMask { get; set; } = 62;
+
+    public bool ExcludePublicHolidays { get; set; } = true;
 
     public int LateGraceMinutes { get; set; } = 15;
 
@@ -42,9 +54,19 @@ public class ShiftTemplate
 
     public bool IsActive { get; set; } = true;
 
+    public bool IsDefault { get; set; }
+
     public DateTimeOffset CreatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
 
     public DateTimeOffset? ModifiedAtUtc { get; set; }
+
+    public Guid? CreatedByUserId { get; set; }
+
+    public string? CreatedByDisplayName { get; set; }
+
+    public Guid? ModifiedByUserId { get; set; }
+
+    public string? ModifiedByDisplayName { get; set; }
 
     // Navigation
     public virtual Business Business { get; set; } = null!;

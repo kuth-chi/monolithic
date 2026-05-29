@@ -1268,6 +1268,8 @@ public sealed class ApplicationDbContext : IdentityDbContext<ApplicationUser, Ap
             entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
             entity.Property(e => e.Description).HasMaxLength(500);
             entity.Property(e => e.Type).HasConversion<string>().HasMaxLength(30);
+            entity.Property(e => e.CreatedByDisplayName).HasMaxLength(200);
+            entity.Property(e => e.ModifiedByDisplayName).HasMaxLength(200);
 
             entity.HasOne(e => e.Business)
                 .WithMany(b => b.ShiftTemplates)

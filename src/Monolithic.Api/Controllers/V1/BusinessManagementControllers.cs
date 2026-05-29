@@ -12,13 +12,14 @@ namespace Monolithic.Api.Controllers.V1;
 /// </summary>
 [ApiController]
 [Route("api/v1/businesses/{businessId:guid}/employees")]
+[ServiceFilter(typeof(ValidateBusinessAccessFilter))]
 public sealed class BusinessEmployeesController(IBusinessEmployeeService employeeService) : ControllerBase
 {
     /// <summary>
     /// Returns a paginated, searchable, and sortable employee list for the business.
     /// </summary>
     [HttpGet]
-    [RequirePermission("business:read")]
+    [RequirePermission("business:read", "employee:read", "employee:manage", "hr:manage")]
     public async Task<IActionResult> GetAll(
         Guid businessId,
         [FromQuery] BusinessEmployeeQueryParameters query,
@@ -32,7 +33,7 @@ public sealed class BusinessEmployeesController(IBusinessEmployeeService employe
     /// Creates an employee account under the given business and returns the employee directory row.
     /// </summary>
     [HttpPost]
-    [RequirePermission("business:write")]
+    [RequirePermission("employee:write", "employee:manage", "hr:manage")]
     public async Task<IActionResult> Create(
         Guid businessId,
         [FromBody] CreateBusinessEmployeeRequest request,
@@ -40,6 +41,79 @@ public sealed class BusinessEmployeesController(IBusinessEmployeeService employe
     {
         var created = await employeeService.CreateAsync(businessId, request, ct);
         return Ok(created);
+    }
+
+    /// <summary>
+    /// Returns one employee row for detail/profile operations.
+    /// </summary>
+    [HttpGet("{employeeId:guid}")]
+    [RequirePermission("employee:read", "employee:write", "employee:manage", "hr:manage")]
+    public async Task<IActionResult> GetById(Guid businessId, Guid employeeId, CancellationToken ct)
+    {
+        var employee = await employeeService.GetByIdAsync(businessId, employeeId, ct);
+        return employee is null ? NotFound() : Ok(employee);
+    }
+
+    /// <summary>
+    /// Updates employee profile data and assigned role.
+    /// </summary>
+    [HttpPut("{employeeId:guid}")]
+    [RequirePermission("employee:write", "employee:manage", "hr:manage")]
+    public async Task<IActionResult> Update(
+        Guid businessId,
+        Guid employeeId,
+        [FromBody] UpdateBusinessEmployeeRequest request,
+        CancellationToken ct)
+    {
+        try
+        {
+            var updated = await employeeService.UpdateAsync(businessId, employeeId, request, ct);
+            return Ok(updated);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Deactivates an employee account while preserving historical records.
+    /// </summary>
+    [HttpPost("{employeeId:guid}/deactivate")]
+    [RequirePermission("employee:write", "employee:manage", "hr:manage")]
+    public async Task<IActionResult> Deactivate(Guid businessId, Guid employeeId, CancellationToken ct)
+    {
+        try
+        {
+            var updated = await employeeService.DeactivateAsync(businessId, employeeId, ct);
+            return Ok(updated);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Soft-deletes an employee account from the business directory.
+    /// </summary>
+    [HttpDelete("{employeeId:guid}")]
+    [RequirePermission("employee:write", "employee:manage", "hr:manage")]
+    public async Task<IActionResult> Delete(Guid businessId, Guid employeeId, CancellationToken ct)
+    {
+        try
+        {
+            await employeeService.DeleteAsync(businessId, employeeId, ct);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
     }
 }
 
@@ -126,12 +200,12 @@ public sealed class BusinessMediaController(IBusinessMediaService mediaService) 
 public sealed class BusinessHolidaysController(IBusinessHolidayService holidayService) : ControllerBase
 {
     [HttpGet]
-    [RequirePermission("business:read")]
+    [RequirePermission("business:read", "hr:manage")]
     public async Task<IActionResult> GetByYear(Guid businessId, [FromQuery] int? year, CancellationToken ct)
         => Ok(await holidayService.GetByYearAsync(businessId, year ?? DateTime.UtcNow.Year, ct));
 
     [HttpPost]
-    [RequirePermission("business:write")]
+    [RequirePermission("business:write", "hr:manage")]
     public async Task<IActionResult> Create(Guid businessId, [FromBody] CreateHolidayRequest request, CancellationToken ct)
     {
         if (request.BusinessId != businessId) return BadRequest("BusinessId mismatch.");
@@ -139,12 +213,12 @@ public sealed class BusinessHolidaysController(IBusinessHolidayService holidaySe
     }
 
     [HttpPut("{holidayId:guid}")]
-    [RequirePermission("business:write")]
+    [RequirePermission("business:write", "hr:manage")]
     public async Task<IActionResult> Update(Guid businessId, Guid holidayId, [FromBody] UpdateHolidayRequest request, CancellationToken ct)
         => Ok(await holidayService.UpdateAsync(holidayId, request, ct));
 
     [HttpDelete("{holidayId:guid}")]
-    [RequirePermission("business:write")]
+    [RequirePermission("business:write", "hr:manage")]
     public async Task<IActionResult> Delete(Guid businessId, Guid holidayId, CancellationToken ct)
     {
         await holidayService.DeleteAsync(holidayId, ct);
@@ -156,7 +230,7 @@ public sealed class BusinessHolidaysController(IBusinessHolidayService holidaySe
     /// Uses the business's HolidayCountryCode setting if countryCode is not specified.
     /// </summary>
     [HttpPost("import")]
-    [RequirePermission("business:write")]
+    [RequirePermission("business:write", "hr:manage")]
     public async Task<IActionResult> Import(
         Guid businessId,
         [FromQuery] string countryCode,
@@ -169,7 +243,7 @@ public sealed class BusinessHolidaysController(IBusinessHolidayService holidaySe
 
     /// <summary>Quickly checks if a specific date is a holiday for this business.</summary>
     [HttpGet("check")]
-    [RequirePermission("business:read")]
+    [RequirePermission("business:read", "hr:manage")]
     public async Task<IActionResult> Check(Guid businessId, [FromQuery] DateOnly date, CancellationToken ct)
         => Ok(new { isHoliday = await holidayService.IsHolidayAsync(businessId, date, ct) });
 }

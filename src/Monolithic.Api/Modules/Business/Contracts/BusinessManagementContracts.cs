@@ -268,6 +268,7 @@ public sealed record BusinessEmployeeDto(
     string JobTitle,
     string Department,
     string Status,
+    string RoleName,
     DateTimeOffset HiredAtUtc,
     DateTimeOffset? TerminatedAtUtc,
     bool IsActive,
@@ -283,10 +284,20 @@ public sealed record CreateBusinessEmployeeRequest(
     string Department,
     string Status,
     string RoleName,
+    Guid? ShiftTemplateId,
     Guid? PrimaryBranchId,
     string? InitialPassword,
     bool IsActive = true,
     DateTimeOffset? HiredAtUtc = null);
+
+public sealed record UpdateBusinessEmployeeRequest(
+    string FullName,
+    string? PhoneNumber,
+    string JobTitle,
+    string Department,
+    string Status,
+    string RoleName,
+    bool IsActive);
 
 public sealed record AssignEmployeeToBranchRequest(
     Guid EmployeeId,
@@ -434,12 +445,21 @@ public sealed record ShiftTemplateDto(
     ShiftTemplateType Type,
     TimeOnly ShiftStart,
     TimeOnly ShiftEnd,
+    TimeOnly? BreakStart,
+    TimeOnly? BreakEnd,
     int BreakMinutes,
+    byte WorkingDaysMask,
+    bool ExcludePublicHolidays,
     int LateGraceMinutes,
     int OvertimeThresholdMinutes,
     bool IsActive,
+    bool IsDefault,
     DateTimeOffset CreatedAtUtc,
-    DateTimeOffset? ModifiedAtUtc);
+    DateTimeOffset? ModifiedAtUtc,
+    Guid? CreatedByUserId,
+    string? CreatedByDisplayName,
+    Guid? ModifiedByUserId,
+    string? ModifiedByDisplayName);
 
 public sealed record UpsertShiftTemplateRequest(
     Guid BusinessId,
@@ -450,10 +470,15 @@ public sealed record UpsertShiftTemplateRequest(
     ShiftTemplateType Type,
     TimeOnly ShiftStart,
     TimeOnly ShiftEnd,
+    TimeOnly? BreakStart,
+    TimeOnly? BreakEnd,
     int BreakMinutes,
+    byte WorkingDaysMask,
+    bool ExcludePublicHolidays,
     int LateGraceMinutes,
     int OvertimeThresholdMinutes,
-    bool IsActive);
+    bool IsActive,
+    bool IsDefault);
 
 public sealed record ShiftAssignmentDto(
     Guid Id,

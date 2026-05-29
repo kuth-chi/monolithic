@@ -97,6 +97,31 @@ public interface IBusinessEmployeeService
         Guid businessId,
         CreateBusinessEmployeeRequest request,
         CancellationToken ct = default);
+
+    /// <summary>Returns one employee row by employee id within the given business, or null if not found.</summary>
+    Task<BusinessEmployeeDto?> GetByIdAsync(
+        Guid businessId,
+        Guid employeeId,
+        CancellationToken ct = default);
+
+    /// <summary>Updates employee profile fields and role assignment.</summary>
+    Task<BusinessEmployeeDto> UpdateAsync(
+        Guid businessId,
+        Guid employeeId,
+        UpdateBusinessEmployeeRequest request,
+        CancellationToken ct = default);
+
+    /// <summary>Deactivates an employee account and marks status as Inactive.</summary>
+    Task<BusinessEmployeeDto> DeactivateAsync(
+        Guid businessId,
+        Guid employeeId,
+        CancellationToken ct = default);
+
+    /// <summary>Soft-deletes an employee account from the business directory.</summary>
+    Task DeleteAsync(
+        Guid businessId,
+        Guid employeeId,
+        CancellationToken ct = default);
 }
 
 /// <summary>

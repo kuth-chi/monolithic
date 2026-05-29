@@ -193,6 +193,11 @@ public static class SeedData
             new() { Id = Guid.NewGuid(), Name = "employees:update", Description = "Update employees" },
             new() { Id = Guid.NewGuid(), Name = "employees:delete", Description = "Delete employees" },
 
+            // Employee management aliases (frontend/access-policy compatibility)
+            new() { Id = Guid.NewGuid(), Name = "employee:write", Description = "Create/update employee records" },
+            new() { Id = Guid.NewGuid(), Name = "employee:manage", Description = "Manage employee lifecycle and access" },
+            new() { Id = Guid.NewGuid(), Name = "hr:manage", Description = "Manage HR operations and employee administration" },
+
             // Sales management
             new() { Id = Guid.NewGuid(), Name = "sales:read", Description = "Read sales data" },
             new() { Id = Guid.NewGuid(), Name = "sales:create", Description = "Create sales orders" },
@@ -567,6 +572,7 @@ public static class SeedData
         await AssignPermissionsToRoleAsync(context, staffRole, permissions,
         [
             "users:read", "employees:read", "employees:create", "employees:update",
+            "employee:write", "employee:manage", "hr:manage",
             "sales:read", "sales:create", "sales:update", "sales:write",
             "accounting:read", "finance:read", "finance:write",
             "inventory:read", "inventory:create", "inventory:update",
